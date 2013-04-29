@@ -1,0 +1,11 @@
+.project
+.pydevproject
+*.pyc
+*.*~
+*.log
+
+build/
+pda.egg-info/
+
+profile.txt
+
