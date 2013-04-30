@@ -39,14 +39,15 @@ class Channel(object):
                          date_parser=date_parser)
         self.series = df.icol(0).tz_localize(timezone)
 
-    def on_duration_per_day(self, pwr_threshold=5, 
-                            acceptable_dropout_rate=0.2):
+    def on_duration_per_day(self, pwr_threshold=5, acceptable_dropout_rate=0.2,
+                            tz_convert=None):
         """
         Args:
             pwr_threshold (float or int): Optional. Threshold which defines the
                 distinction between "on" and "off".  Watts.
             acceptable_dropout_rate (float). Must be >= 0 and <= 1.  Remove any
                 row which has a greater sampling dropout rate.
+            tz_convert (str): (optional) Use 'midnight' in this timezone.
             
         Returns:
             pd.DataFrame.  One row per day.  Columns:
@@ -56,10 +57,15 @@ class Channel(object):
         
         assert(0 <= acceptable_dropout_rate <= 1)
 
+        if tz_convert is not None:
+            series = self.series.tz_convert(tz_convert)
+        else:
+            series = self.series
+
         # Construct the index for the output.  Each item is a Datetime
         # at midnight.  Get rid of the first & last items so rng represents
         # just the full-days for which we have date.
-        rng = pd.date_range(self.series.index[0], self.series.index[-1],
+        rng = pd.date_range(series.index[0], series.index[-1],
                             freq='D', normalize=True)
         on_durations = pd.Series(   index=rng, dtype=np.timedelta64)
         sample_sizes = pd.Series(0, index=rng, dtype=np.int64)
@@ -68,7 +74,7 @@ class Channel(object):
                                (1-acceptable_dropout_rate))
 
         for day in rng:
-            data_for_day = self.series[day.strftime('%Y-%m-%d')]
+            data_for_day = series[day.strftime('%Y-%m-%d')]
             if data_for_day.size < min_samples_per_day:
                 continue
             i_above_threshold = np.where(data_for_day[:-1] >= pwr_threshold)[0]
