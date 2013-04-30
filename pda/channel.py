@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 import pandas as pd
 import numpy as np
 import datetime as dt
@@ -24,34 +25,36 @@ class Channel(object):
         self.series = df.icol(0).tz_localize(timezone)
         self.max_sample_period = dt.timedelta(seconds=max_sample_period)
 
-    def on_duration_per_day(self, pwr_threshold=2):
+    def on_duration_per_day(self, pwr_threshold=5):
         """
         Args:
             pwr_threshold (float or int): Optional. Threshold which defines the
                 distinction between "on" and "off".  Watts.    
             
         Returns:
-            pd.dataframe.  One row per day.
+            pd.DataFrame.  One row per day.  Columns:
+                on_duration (dt.timedelta)
+                sample_size (np.int64)
         """
-        
-        # Go through each pair of consecutive samples.
-        #   Is the first sample above threshold?  If yes:
-        #      Is the period < max_sample_period?  If yes:
-        #         Add this period to the total
-        
+
         # Construct the index for the output.  Each item is a Datetime
-        # at midnight.  Get rid of the very first item so rng represents
+        # at midnight.  Get rid of the first & last items so rng represents
         # just the full-days for which we have date.
         rng = pd.date_range(self.series.index[0], self.series.index[-1],
-                            freq='D', normalize=True)[1:]
-        
+                            freq='D', normalize=True)[1:-1]
+        on_durations = pd.Series(   index=rng, dtype=dt.timedelta)
+        sample_sizes = pd.Series(0, index=rng, dtype=np.int64)
+
         for day in rng:
-            on_time = dt.timedelta(0)
+            on_duration = dt.timedelta(0)
             data_for_day = self.series[day.strftime('%Y-%m-%d')]
-            for i in range(data_for_day.size-2):
-                if data_for_day[i] >= pwr_threshold:
-                    period = data_for_day.index[i+1] - data_for_day.index[i]
-                    if period > self.max_sample_period:
-                        period = self.max_sample_period
-                    on_time += period    
-            print(day, on_time)
+            for i in np.where(data_for_day[:-1] >= pwr_threshold)[0]:
+                period = data_for_day.index[i+1] - data_for_day.index[i]
+                if period > self.max_sample_period:
+                    period = self.max_sample_period
+                on_duration += period
+            on_durations[day] = on_duration
+            sample_sizes[day] = data_for_day.size
+
+        return pd.DataFrame({'on_duration':on_durations,
+                             'sample_size':sample_sizes})
