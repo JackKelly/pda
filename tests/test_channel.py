@@ -9,8 +9,8 @@ TEST_DATA_PATH = os.path.join(FILE_PATH, 'test_data')
 
 class TestChannel(unittest.TestCase):
     def setUp(self):
-        # self.channel = Channel(os.path.join(TEST_DATA_PATH, 'channel_1.dat'))
-        self.channel = Channel('/data/mine/vadeec/jack-merged/channel_1.dat')
+        self.channel = Channel(os.path.join(TEST_DATA_PATH, 'channel_1.dat'))
+        # self.channel = Channel('/data/mine/vadeec/jack-merged/channel_1.dat')
         
     def test_init(self):
         self.assertIsNotNone(self.channel)
