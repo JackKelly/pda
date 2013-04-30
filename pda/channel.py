@@ -8,7 +8,7 @@ class Channel(object):
     
     Attributes:
         series (pd.series): the power data in Watts.
-        max_sample_period (dt.timedelta): The maximum time allowed
+        max_sample_period (np.timedelta64, s): The maximum time allowed
             between samples. If data is missing for longer than
             max_sample_period then the appliance is assumed to be off.
     """
@@ -23,7 +23,7 @@ class Channel(object):
                          dtype={'timestamp':np.float64, 'power':np.float64},
                          date_parser=date_parser)
         self.series = df.icol(0).tz_localize(timezone)
-        self.max_sample_period = dt.timedelta(seconds=max_sample_period)
+        self.max_sample_period = np.timedelta64(max_sample_period, 's')
 
     def on_duration_per_day(self, pwr_threshold=5):
         """
@@ -33,7 +33,7 @@ class Channel(object):
             
         Returns:
             pd.DataFrame.  One row per day.  Columns:
-                on_duration (dt.timedelta)
+                on_duration (np.timedelta64[ns])
                 sample_size (np.int64)
         """
 
@@ -42,18 +42,16 @@ class Channel(object):
         # just the full-days for which we have date.
         rng = pd.date_range(self.series.index[0], self.series.index[-1],
                             freq='D', normalize=True)[1:-1]
-        on_durations = pd.Series(   index=rng, dtype=dt.timedelta)
+        on_durations = pd.Series(   index=rng, dtype=np.timedelta64)
         sample_sizes = pd.Series(0, index=rng, dtype=np.int64)
 
         for day in rng:
-            on_duration = dt.timedelta(0)
             data_for_day = self.series[day.strftime('%Y-%m-%d')]
-            for i in np.where(data_for_day[:-1] >= pwr_threshold)[0]:
-                period = data_for_day.index[i+1] - data_for_day.index[i]
-                if period > self.max_sample_period:
-                    period = self.max_sample_period
-                on_duration += period
-            on_durations[day] = on_duration
+            i_above_threshold = np.where(data_for_day[:-1] >= pwr_threshold)[0]
+            timedeltas = (data_for_day.index[i_above_threshold+1].values -
+                          data_for_day.index[i_above_threshold].values)
+            timedeltas[timedeltas > self.max_sample_period] = self.max_sample_period
+            on_durations[day] = timedeltas.sum()
             sample_sizes[day] = data_for_day.size
 
         return pd.DataFrame({'on_duration':on_durations,
