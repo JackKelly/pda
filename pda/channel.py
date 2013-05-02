@@ -91,7 +91,7 @@ class Channel(object):
         # Construct the index for the output.  Each item is a Datetime
         # at midnight.
         rng = pd.date_range(series.index[0], series.index[-1],
-                            freq='D', normalize=True)[1:]
+                            freq='D', normalize=True)
         print(rng)
         on_durations = pd.Series(   index=rng, dtype=np.float)
         sample_sizes = pd.Series(0, index=rng, dtype=np.int64)
@@ -102,8 +102,10 @@ class Channel(object):
         max_samples_per_2days = max_samples_per_day * 2
 
         unprocessed_data = series.copy()
-        for day in rng:
-            indicies_for_day = np.where(unprocessed_data.index[:max_samples_per_2days] < day)[0]
+        for day_i in range(rng.size-1):
+            indicies_for_day = np.where(unprocessed_data.index[:max_samples_per_2days] 
+                                        < rng[day_i+1])[0]
+            day = rng[day_i]
             if indicies_for_day.size == 0:
                 print("no data for", day)
                 continue
@@ -115,7 +117,8 @@ class Channel(object):
             timedeltas = (data_for_day.index[i_above_threshold+1].values -
                           data_for_day.index[i_above_threshold].values)
             timedeltas[timedeltas > max_sample_period] = max_sample_period
-            on_durations[day] = timedeltas.sum().astype('timedelta64[s]').astype(np.int64) / SECS_PER_HOUR
+            on_durations[day] = (timedeltas.sum().astype('timedelta64[s]')
+                                 .astype(np.int64) / SECS_PER_HOUR)
             sample_sizes[day] = data_for_day.size
 
         df = pd.DataFrame({'on_duration':on_durations,
