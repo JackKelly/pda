@@ -103,15 +103,32 @@ class Channel(object):
 
         unprocessed_data = series.copy()
         for day_i in range(rng.size-1):
+            # The simplest way to get data for just a single day is to use
+            # data_for_day = series[day.strftime('%Y-%m-%d')]
+            # but this takes about 300ms per call on my machine.
+            # So we take advantage of several features of the data to achieve
+            # a 300x speedup:
+            # 1. We use the fact that the data is sorted by date, hence 
+            #    we can chomp through it in order.  The variable
+            #    unprocessed_data stores the data still to be processed.
+            # 2. max_samples_per_day sets an upper bound on the number of
+            #    datapoints per day.  The code is conservative and uses 
+            #    max_samples_per_2days. We only search through a small subset
+            #    of the available data.
             indicies_for_day = np.where(unprocessed_data.index[:max_samples_per_2days] 
                                         < rng[day_i+1])[0]
             day = rng[day_i]
             if indicies_for_day.size == 0:
-                print("no data for", day)
+                print("No data available for   ", day.strftime('%Y-%m-%d'))
                 continue
             data_for_day = unprocessed_data[indicies_for_day]
             unprocessed_data = unprocessed_data[indicies_for_day[-1]+1:]
             if data_for_day.size < min_samples_per_day:
+                print("Insufficient samples for", day.strftime('%Y-%m-%d'),
+                      "; samples =", data_for_day.size,
+                      "dropout_rate = {:.2%}".format(1 - (data_for_day.size / max_samples_per_day)))
+                print("                 start =", data_for_day.index[0])
+                print("                   end =", data_for_day.index[-1])
                 continue
             i_above_threshold = np.where(data_for_day[:-1] >= pwr_threshold)[0]
             timedeltas = (data_for_day.index[i_above_threshold+1].values -
