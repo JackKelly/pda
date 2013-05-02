@@ -1,19 +1,22 @@
-"""
-REQUIREMENTS:
-  pandas >= 0.11.0
-"""
-
 from __future__ import print_function, division
 import pandas as pd
 import numpy as np
 import datetime as dt
 import scipy.stats as stats
+import time
+
+"""
+REQUIREMENTS:
+  pandas >= 0.11.0
+"""
 
 SECS_PER_HOUR = 3600
 SECS_PER_DAY = 86400
-
+DEFAULT_TIMEZONE = 'Europe/London'
+ 
 class Channel(object):
-    """A single channel of data.
+    """
+    A single channel of data.
     
     Attributes:
         series (pd.series): the power data in Watts.
@@ -22,8 +25,6 @@ class Channel(object):
             max_sample_period then the appliance is assumed to be off.
         sample_period (float)
     """
-    
-    DEFAULT_TIMEZONE = 'Europe/London'
     
     def __init__(self, filename=None, timezone=DEFAULT_TIMEZONE,
                  sample_period=None, # seconds
@@ -90,24 +91,24 @@ class Channel(object):
         # Construct the index for the output.  Each item is a Datetime
         # at midnight.
         rng = pd.date_range(series.index[0], series.index[-1],
-                            freq='D', normalize=True)
+                            freq='D', normalize=True)[1:]
         print(rng)
         on_durations = pd.Series(   index=rng, dtype=np.float)
         sample_sizes = pd.Series(0, index=rng, dtype=np.int64)
 
-        min_samples_per_day = ((SECS_PER_DAY / self.sample_period) * 
-                               (1-acceptable_dropout_rate))
-
+        max_samples_per_day = SECS_PER_DAY / self.sample_period
+        min_samples_per_day = max_samples_per_day * (1-acceptable_dropout_rate)
         max_sample_period = np.timedelta64(self.max_sample_period, 's')
+        max_samples_per_2days = max_samples_per_day * 2
 
+        unprocessed_data = series.copy()
         for day in rng:
-            try:
-                # TODO: I think the line below is really slow.  Would probably
-                # be faster to make use of the fact that the data
-                # is in order, somehow...
-                data_for_day = series[day.strftime('%Y-%m-%d')]
-            except IndexError:
+            indicies_for_day = np.where(unprocessed_data.index[:max_samples_per_2days] < day)[0]
+            if indicies_for_day.size == 0:
+                print("no data for", day)
                 continue
+            data_for_day = unprocessed_data[indicies_for_day]
+            unprocessed_data = unprocessed_data[indicies_for_day[-1]+1:]
             if data_for_day.size < min_samples_per_day:
                 continue
             i_above_threshold = np.where(data_for_day[:-1] >= pwr_threshold)[0]
@@ -121,3 +122,4 @@ class Channel(object):
                            'sample_size':sample_sizes})
 
         return df.dropna()
+

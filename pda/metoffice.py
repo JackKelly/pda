@@ -20,7 +20,7 @@ def open_daily_xls(filename, sheet='HEATHROW'):
     u'Daily Minimum Concrete Temperature (0900-0900) (\xb0C)': 'max_concrete_temp'}
     
     df = df.rename(columns=columns)
-    df = df.tz_localize('UTC')    
+    df = df.tz_localize('UTC')
     df = df.asfreq('D')
     
     # the rainfall column contains "tr" and "n/a".  
