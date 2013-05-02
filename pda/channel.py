@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import datetime as dt
 import scipy.stats as stats
-import time
 
 """
 REQUIREMENTS:
