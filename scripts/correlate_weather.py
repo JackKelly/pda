@@ -1,10 +1,7 @@
 #!/usr/bin/python
 from __future__ import print_function, division
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-
-from pda.channel import Channel, SECS_PER_HOUR
+from pda.channel import Channel
 import pda.metoffice as metoffice
 
 print("Opening metoffice data...")
@@ -17,7 +14,8 @@ lights = Channel('/data/mine/vadeec/jack-merged/channel_8.dat')
 print("Calculating...")
 on = lights.on_duration_per_day(tz_convert='UTC')
 
-on_dur_aligned, sun_aligned = on.on_duration.align(weather.sunshine.dropna(), join='inner')
+on_dur_aligned, sun_aligned = on.on_duration.align(weather.sunshine.dropna(), 
+                                                   join='inner')
 
 print("Plotting...")
 
