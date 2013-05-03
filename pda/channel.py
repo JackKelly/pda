@@ -12,7 +12,7 @@ REQUIREMENTS:
 SECS_PER_HOUR = 3600
 SECS_PER_DAY = 86400
 DEFAULT_TIMEZONE = 'Europe/London'
- 
+
 class Channel(object):
     """
     A single channel of data.
@@ -47,6 +47,7 @@ class Channel(object):
             self.sample_period = mode_fwd_diff / 1E9
 
     def dropout_rate(self):
+        """Calculate the dropout rate based on self.sample_period."""
         duration = self.series.index[-1] - self.series.index[0]        
         n_expected_samples = duration.total_seconds() / self.sample_period
         return 1 - (self.series.size / n_expected_samples)
@@ -55,7 +56,8 @@ class Channel(object):
         s = ""
         s += "     start date = {}\n".format(self.series.index[0])
         s += "       end date = {}\n".format(self.series.index[-1])
-        s += "       duration = {}\n".format(self.series.index[-1] - self.series.index[0])
+        s += "       duration = {}\n".format(self.series.index[-1] - 
+                                             self.series.index[0])
         s += "  sample period = {:>7.1f}s\n".format(self.sample_period)
         s += "total # samples = {:>5d}\n".format(self.series.size)
         s += "   dropout rate = {:>8.1%}\n".format(self.dropout_rate())
@@ -63,7 +65,7 @@ class Channel(object):
         s += "      min power = {:>7.1f}W\n".format(self.series.min())
         s += "     mode power = {:>7.1f}W\n".format(stats.mode(self.series)[0][0])
         return s
-            
+
     def on_duration_per_day(self, pwr_threshold=5, acceptable_dropout_rate=0.2,
                             tz_convert=None):
         """
@@ -125,7 +127,8 @@ class Channel(object):
             if data_for_day.size < min_samples_per_day:
                 print("Insufficient samples for", day.strftime('%Y-%m-%d'),
                       "; samples =", data_for_day.size,
-                      "dropout_rate = {:.2%}".format(1 - (data_for_day.size / max_samples_per_day)))
+                      "dropout_rate = {:.2%}".format(1 - (data_for_day.size / 
+                                                          max_samples_per_day)))
                 print("                 start =", data_for_day.index[0])
                 print("                   end =", data_for_day.index[-1])
                 continue
