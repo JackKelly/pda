@@ -8,6 +8,8 @@
 #include "numpy/arrayobject.h"
 #include "numpy/ufuncobject.h"
 
-const size_t count_lines(std::fstream& fs);
+int count_lines(std::string filename);
 void print_ts(const tm& timestamp);
-std::list<std::pair<npy_float64, npy_float64> > load_data(std::string filename);
+std::list<std::pair<npy_float64, npy_float64> > load_list(std::string filename);
+// PyObject* load_data(std::string filename);
+void load_data(std::string filename, int size, double* array);

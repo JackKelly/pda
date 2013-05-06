@@ -26,9 +26,12 @@
  *
  * @return number of data points.
  */
-const size_t count_lines(std::fstream& fs)
+int count_lines(std::string filename)
 {
-    size_t count = 0;
+    std::fstream fs;
+    fs.open(filename.c_str(), std::fstream::in);
+
+    int count = 0;
     char line[255];
 
     while (!fs.eof()) {
@@ -38,9 +41,7 @@ const size_t count_lines(std::fstream& fs)
         }
     }
 
-    // Return the read pointer to the beginning of the file
-    fs.clear();
-    fs.seekg(0, std::ios_base::beg); // seek to beginning of file
+    fs.close();
 
     return count;
 }
@@ -55,7 +56,7 @@ void print_ts(const tm& timestamp)
               << timestamp.tm_sec << " ";
 }
 
-std::list<std::pair<npy_float64, npy_float64> > load_data(std::string filename)
+std::list<std::pair<npy_float64, npy_float64> > load_list(std::string filename)
 {
     std::fstream fs;
     std::list<std::pair<npy_float64, npy_float64> > data;
@@ -76,6 +77,40 @@ std::list<std::pair<npy_float64, npy_float64> > load_data(std::string filename)
     fs.close();
 
     return data;
+}
+
+void load_data(std::string filename, int size, double* array)
+{
+    std::list<std::pair<npy_float64, npy_float64> > data_as_list;
+    data_as_list = load_list(filename);
+
+    /* Create numpy array */
+//    int dimensions[1];
+//    dimensions[0] = data_as_list.size();
+//    dimensions[0] = 10;
+//    std::cout << data_as_list.size() << std::endl;
+//    PyObject* array = NULL;
+//    std::cout << "declared" << std::endl;    
+//    array = PyArray_FromDims(1, dimensions, PyArray_DOUBLE);
+//    std::cout << "constructed" << std::endl;    
+
+    size_t i=0;
+    for (std::list<std::pair<npy_float64, npy_float64> >::iterator it=data_as_list.begin();
+         it != data_as_list.end(); it++) {
+        // array->data[i*array->strides[0]] = it->first;
+        // array->data[i*array->strides[0] + array->strides[1]] = it->second;
+        array[i] = (double)it->first;
+        i++;
+    }
+       
+//    return PyArray_Return(array);
+//    return (PyObject*)array;
+//    return NULL;
+}
+
+void read_array(PyArrayObject array)
+{
+    std::cout << "size = " << array.dimensions[0] << std::endl;
 }
 
 // int main()
