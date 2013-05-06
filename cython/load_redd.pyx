@@ -9,7 +9,9 @@ from libcpp.string cimport string
 
 # TODO: 
 # pass both timestamps and power data back
-# use np.datetime64 throughout
+# can we use a pd.DatetimeIndex and pass that?  Something like:
+# cdef np.ndarray[DTYPE_t, ndim=1] array = pd.DatetimeIndex(np.empty((n_lines, ), dtype=np.int64))
+# but that has problems. ValueError: cannot include dtype 'M' in a buffer
 # NEEDS lots of tidying!
 # is there a cleaner way to get number of lines (although it's pretty quick rightnow)
 # convert to pandas series
@@ -23,6 +25,7 @@ from libcpp.string cimport string
 
 import numpy as np
 cimport numpy as np
+import pandas as pd
 
 DTYPE = np.uint64
 ctypedef np.uint64_t DTYPE_t
@@ -36,14 +39,6 @@ cdef extern from "load_data.h":
 def load(filename="/data/mine/vadeec/jack-merged/channel_3.dat"):
     n_lines = count_lines(filename)
     print(n_lines, "lines found")
-#    cdef np.ndarray[np.double_t, ndim=1] array = np.empty((n_lines, ), dtype=np.double)
     cdef np.ndarray[DTYPE_t, ndim=1] array = np.empty((n_lines, ), dtype=DTYPE)
     load_data(filename, n_lines, <DTYPE_t*>array.data)
     return array
-
-    # cdef list[pair[double, double]] data
-    # data = load_data(filename)
-    # cdef np.ndarray[DTYPE_t, ndim=2] ndret = np.array(data)
-    # cdef np.ndarray[DTYPE_t, ndim=2] ndret = np.empty([len(data), 2], dtype=DTYPE)
-
-
