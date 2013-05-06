@@ -55,10 +55,10 @@ void print_ts(const tm& timestamp)
               << timestamp.tm_sec << " ";
 }
 
-std::list<std::pair<double, double> > load_data(std::string filename)
+std::list<std::pair<npy_float64, npy_float64> > load_data(std::string filename)
 {
     std::fstream fs;
-    std::list<std::pair<double, double> > data;
+    std::list<std::pair<npy_float64, npy_float64> > data;
     char ch;
     double timestamp, power;
 
@@ -69,7 +69,7 @@ std::list<std::pair<double, double> > load_data(std::string filename)
         if (isdigit(ch)) {
             fs >> timestamp;
             fs >> power;
-            data.push_back(std::pair<double, double>(timestamp, power));
+            data.push_back(std::pair<npy_float64, npy_float64>(timestamp, power));
         }
         fs.ignore(255, '\n');  // skip to next line
     }
