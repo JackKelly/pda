@@ -81,44 +81,24 @@ std::list<std::pair<npy_float64, npy_float64> > load_list(std::string filename)
 
 void load_data(std::string filename, int size, double* array)
 {
-    std::list<std::pair<npy_float64, npy_float64> > data_as_list;
-    data_as_list = load_list(filename);
+    std::fstream fs;
+    char ch;
+    double timestamp, power;
+    fs.open(filename.c_str(), std::fstream::in);
 
-    /* Create numpy array */
-//    int dimensions[1];
-//    dimensions[0] = data_as_list.size();
-//    dimensions[0] = 10;
-//    std::cout << data_as_list.size() << std::endl;
-//    PyObject* array = NULL;
-//    std::cout << "declared" << std::endl;    
-//    array = PyArray_FromDims(1, dimensions, PyArray_DOUBLE);
-//    std::cout << "constructed" << std::endl;    
-
-    size_t i=0;
-    for (std::list<std::pair<npy_float64, npy_float64> >::iterator it=data_as_list.begin();
-         it != data_as_list.end(); it++) {
-        // array->data[i*array->strides[0]] = it->first;
-        // array->data[i*array->strides[0] + array->strides[1]] = it->second;
-        array[i] = (double)it->first;
-        i++;
+    size_t i=0;    
+    while (!fs.eof()) {
+        ch = fs.peek();
+        if (isdigit(ch)) {
+            fs >> timestamp;
+            fs >> power;
+            array[i] = timestamp;
+            i++;
+            if (i > size) {
+                break;
+            }
+        }
+        fs.ignore(255, '\n');  // skip to next line
     }
-       
-//    return PyArray_Return(array);
-//    return (PyObject*)array;
-//    return NULL;
+    fs.close();
 }
-
-void read_array(PyArrayObject array)
-{
-    std::cout << "size = " << array.dimensions[0] << std::endl;
-}
-
-// int main()
-// {
-//     std::list<std::pair<double, double> > data;
-//     data = load_data("/data/mine/vadeec/jack-merged/channel_3.dat");
-    
-//     std::cout << data.front().first << " " << data.front().second << std::endl;
-
-//     return 0;
-// }

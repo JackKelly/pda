@@ -42,9 +42,7 @@ def load(filename="/data/mine/vadeec/jack-merged/channel_3.dat"):
 
     # cdef list[pair[double, double]] data
     # data = load_data(filename)
-
     # cdef np.ndarray[DTYPE_t, ndim=2] ndret = np.array(data)
-
     # cdef np.ndarray[DTYPE_t, ndim=2] ndret = np.empty([len(data), 2], dtype=DTYPE)
 
 
