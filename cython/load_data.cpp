@@ -1,6 +1,4 @@
-#include <iostream>
-#include <fstream>
-#include <time.h>
+#include "load_data.h"
 
 /**
  * Interesting notes:
@@ -28,7 +26,7 @@
  *
  * @return number of data points.
  */
-const size_t count_lines( std::fstream& fs )
+const size_t count_lines(std::fstream& fs)
 {
     size_t count = 0;
     char line[255];
@@ -57,36 +55,35 @@ void print_ts(const tm& timestamp)
               << timestamp.tm_sec << " ";
 }
 
-double* load_data(const char* filename)
+std::list<std::pair<double, double> > load_data(std::string filename)
 {
     std::fstream fs;
-    fs.open(filename, std::fstream::in);
-
-    size_t file_length = count_lines(fs)
-    tm* timestamps = new tm[file_length];
-    int* power = new int[file_length];
-
-    size_t count = 0;
-    time_t time;
+    std::list<std::pair<double, double> > data;
     char ch;
+    double timestamp, power;
+
+    fs.open(filename.c_str(), std::fstream::in);
+    
     while (!fs.eof()) {
         ch = fs.peek();
         if (isdigit(ch)) {
-            fs >> time;
-            timestamps[count] = *gmtime(&time);
-            fs >> power[count];
-            count++;
+            fs >> timestamp;
+            fs >> power;
+            data.push_back(std::pair<double, double>(timestamp, power));
         }
         fs.ignore(255, '\n');  // skip to next line
     }
     fs.close();
 
-    print_ts(timestamps[0]);
-    std::cout << " " << power[0] << std::endl;
-
-    print_ts(timestamps[file_length-1]);
-    std::cout << " " << power[file_length-1] << std::endl;
-
-    std::cout << "done." << std::endl;
-    return 0;
+    return data;
 }
+
+// int main()
+// {
+//     std::list<std::pair<double, double> > data;
+//     data = load_data("/data/mine/vadeec/jack-merged/channel_3.dat");
+    
+//     std::cout << data.front().first << " " << data.front().second << std::endl;
+
+//     return 0;
+// }
