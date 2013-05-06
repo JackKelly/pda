@@ -19,6 +19,7 @@ from libcpp.string cimport string
 # http://stackoverflow.com/questions/4495420/passing-numpy-arrays-to-c-code-wrapped-with-cython
 # http://docs.cython.org/src/userguide/numpy_tutorial.html
 # http://docs.cython.org/src/userguide/wrapping_CPlusPlus.html
+# http://docs.cython.org/src/userguide/external_C_code.html
 
 import numpy as np
 cimport numpy as np
