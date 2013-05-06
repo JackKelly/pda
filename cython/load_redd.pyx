@@ -24,20 +24,21 @@ from libcpp.string cimport string
 import numpy as np
 cimport numpy as np
 
-DTYPE = np.float64
-ctypedef np.float64_t DTYPE_t
+DTYPE = np.uint64
+ctypedef np.uint64_t DTYPE_t
 
 cdef extern from "load_data.h":
     int count_lines(string)
     # np.ndarray[DTYPE_t, ndim=1] load_data(string)
-    void load_data(string filename, int size, double* array)
+    void load_data(string filename, int size, DTYPE_t* array)
     # list[pair[double, double]] load_list(string)
 
 def load(filename="/data/mine/vadeec/jack-merged/channel_3.dat"):
     n_lines = count_lines(filename)
     print(n_lines, "lines found")
-    cdef np.ndarray[np.double_t, ndim=1] array = np.empty((n_lines, ), dtype=np.double)
-    load_data(filename, n_lines, <double*>array.data)
+#    cdef np.ndarray[np.double_t, ndim=1] array = np.empty((n_lines, ), dtype=np.double)
+    cdef np.ndarray[DTYPE_t, ndim=1] array = np.empty((n_lines, ), dtype=DTYPE)
+    load_data(filename, n_lines, <DTYPE_t*>array.data)
     return array
 
     # cdef list[pair[double, double]] data
