@@ -17,7 +17,15 @@ def open_daily_xls(filename, sheet='HEATHROW'):
     u'Daily Total Global Radiation (KJ/m2)': 'radiation',
     u'Daily Total Sunshine (0100-2400) (hrs)': 'sunshine',
     u'Daily Minimum Grass Temperature (0900-0900) (\xb0C)': 'max_grass_temp',
-    u'Daily Minimum Concrete Temperature (0900-0900) (\xb0C)': 'max_concrete_temp'}
+    u'Daily Minimum Concrete Temperature (0900-0900) (\xb0C)': 'max_concrete_temp'
+    }
+
+    descriptions = {
+        'radiation': 'daily total global radiation $KJ/m^{2}$',
+        'max_temp': 'daily maximum temperature $\degree C$',
+        'min_temp': 'daily minimum temperature $\degree C$',
+        'mean_temp': 'daily mean temperature from hourly data $\degree C$'
+    }
     
     df = df.rename(columns=columns)
     df = df.tz_localize('UTC')
@@ -27,5 +35,9 @@ def open_daily_xls(filename, sheet='HEATHROW'):
     # "tr" means "trace" (less than 0.05mm).  Replace "tr" with 0.04
     df['rainfall'][df['rainfall'] == 'tr'] = 0.04
     df['rainfall'] = df['rainfall'].astype(np.float)
+
+    for key, val in descriptions.iteritems():
+        print("renaming", key)
+        df[key].description = val
 
     return df
