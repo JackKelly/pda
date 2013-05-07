@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import datetime as dt
 import scipy.stats as stats
+import load_pwr_data
 
 """
 REQUIREMENTS:
@@ -35,12 +36,7 @@ class Channel(object):
             self.load(filename, timezone)
         
     def load(self, filename, timezone=DEFAULT_TIMEZONE):
-        date_parser = lambda x: dt.datetime.fromtimestamp(x)
-        df = pd.read_csv(filename, sep=' ', parse_dates=True,
-                         index_col=0, names=['timestamp', 'power'],
-                         dtype={'timestamp':np.float64, 'power':np.float64},
-                         date_parser=date_parser)
-        self.series = df.icol(0).tz_localize(timezone)
+        self.series = load_pwr_data.load(filename, tz=timezone)
         if self.sample_period is None:
             fwd_diff = np.diff(self.series.index.values).astype(np.float)
             mode_fwd_diff = int(round(stats.mode(fwd_diff)[0][0]))
@@ -93,7 +89,6 @@ class Channel(object):
         # at midnight.
         rng = pd.date_range(series.index[0], series.index[-1],
                             freq='D', normalize=True)
-        print(rng)
         on_durations = pd.Series(   index=rng, dtype=np.float)
         sample_sizes = pd.Series(0, index=rng, dtype=np.int64)
 
