@@ -1,0 +1,8 @@
+include *.txt
+include *.md
+recursive-include pda *.pyx
+recursive-include pda *.cpp
+recursive-include pda *.h
+recursive-include pda *.py
+recursive-include tests *.py
+recursive-include scripts *.py

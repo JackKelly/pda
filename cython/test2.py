@@ -1,6 +1,5 @@
 from __future__ import print_function, division
 import load_redd
-import pandas as pd
 import time
 
 class TimeIt(object):
@@ -26,7 +25,7 @@ class TimeIt(object):
 t = TimeIt()
 
 t.time()
-d = load_redd.load()
+d = load_redd.load('/data/mine/vadeec/jack-merged/channel_3.dat')
 t.time('load redd')
 
 print(t)

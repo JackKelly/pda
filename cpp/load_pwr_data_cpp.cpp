@@ -1,6 +1,4 @@
-#include <iostream>
-#include <fstream>
-#include <time.h>
+#include "load_pwr_data_cpp.h"
 
 /**
  * Interesting notes:
@@ -28,8 +26,11 @@
  *
  * @return number of data points.
  */
-const size_t count_lines( std::fstream& fs )
+size_t count_lines(const std::string filename)
 {
+    std::fstream fs;
+    fs.open(filename.c_str(), std::fstream::in);
+
     size_t count = 0;
     char line[255];
 
@@ -40,10 +41,7 @@ const size_t count_lines( std::fstream& fs )
         }
     }
 
-    // Return the read pointer to the beginning of the file
-    fs.clear();
-    fs.seekg(0, std::ios_base::beg); // seek to beginning of file
-
+    fs.close();
     return count;
 }
 
@@ -57,36 +55,55 @@ void print_ts(const tm& timestamp)
               << timestamp.tm_sec << " ";
 }
 
-double* load_data(const char* filename)
+std::list<std::pair<npy_float64, npy_float64> > load_list(const std::string filename)
 {
     std::fstream fs;
-    fs.open(filename, std::fstream::in);
-
-    size_t file_length = count_lines(fs)
-    tm* timestamps = new tm[file_length];
-    int* power = new int[file_length];
-
-    size_t count = 0;
-    time_t time;
+    std::list<std::pair<npy_float64, npy_float64> > data;
     char ch;
+    double timestamp, power;
+
+    fs.open(filename.c_str(), std::fstream::in);
+    
     while (!fs.eof()) {
         ch = fs.peek();
         if (isdigit(ch)) {
-            fs >> time;
-            timestamps[count] = *gmtime(&time);
-            fs >> power[count];
-            count++;
+            fs >> timestamp;
+            fs >> power;
+            data.push_back(std::pair<npy_float64, npy_float64>(timestamp, power));
         }
         fs.ignore(255, '\n');  // skip to next line
     }
     fs.close();
 
-    print_ts(timestamps[0]);
-    std::cout << " " << power[0] << std::endl;
+    return data;
+}
 
-    print_ts(timestamps[file_length-1]);
-    std::cout << " " << power[file_length-1] << std::endl;
+/**
+ * @param filename: full path of filename
+ * @param size: number of lines to load
+ * @param timestamps: returned timestamp data
+ * @param powers: returned power data
+ */
+void load_data(const std::string filename, const size_t size,
+               npy_uint64* timestamps, npy_float32* powers)
+{
+    std::fstream fs;
+    char ch;
+    double timestamp;
+    fs.open(filename.c_str(), std::fstream::in);
 
-    std::cout << "done." << std::endl;
-    return 0;
+    size_t i=0;    
+    while (!fs.eof()) {
+        ch = fs.peek();
+        if (isdigit(ch)) {
+            fs >> timestamp;
+            timestamps[i] = timestamp * 1000000000;
+            fs >> powers[i];
+            if (++i > size) {
+                break;
+            }
+        }
+        fs.ignore(255, '\n');  // skip to next line
+    }
+    fs.close();
 }

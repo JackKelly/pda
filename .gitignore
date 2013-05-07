@@ -3,10 +3,12 @@
 *.pyc
 *.*~
 *.log
+profile.txt
+*.so
 
 build/
-pda.egg-info/
+*.egg-info/
+dist/
+.ropeproject/
 
-profile.txt
 
-.ropeproject
