@@ -8,10 +8,6 @@ from libcpp.list cimport list
 from libcpp.string cimport string
 
 # TODO: 
-# pass both timestamps and power data back
-# can we use a pd.DatetimeIndex and pass that?  Something like:
-# cdef np.ndarray[DTYPE_t, ndim=1] array = pd.DatetimeIndex(np.empty((n_lines, ), dtype=np.int64))
-# but that has problems. ValueError: cannot include dtype 'M' in a buffer
 # NEEDS lots of tidying!
 # is there a cleaner way to get number of lines (although it's pretty quick rightnow)
 # convert to pandas series
@@ -32,13 +28,22 @@ ctypedef np.uint64_t DTYPE_t
 
 cdef extern from "load_data.h":
     int count_lines(string)
-    # np.ndarray[DTYPE_t, ndim=1] load_data(string)
-    void load_data(string filename, int size, DTYPE_t* array)
+    void load_data(string filename, int size, DTYPE_t* timestamps, np.float32_t* power)
     # list[pair[double, double]] load_list(string)
 
 def load(filename="/data/mine/vadeec/jack-merged/channel_3.dat"):
     n_lines = count_lines(filename)
     print(n_lines, "lines found")
-    cdef np.ndarray[DTYPE_t, ndim=1] array = np.empty((n_lines, ), dtype=DTYPE)
-    load_data(filename, n_lines, <DTYPE_t*>array.data)
-    return array
+
+    cdef np.ndarray[DTYPE_t, ndim=1, mode='c'] timestamps  = np.empty((n_lines, ), dtype=DTYPE)
+    cdef np.ndarray[np.float32_t, ndim=1, mode='c'] powers = np.empty((n_lines, ), dtype=np.float32)
+
+    # ascontiguous array from http://stackoverflow.com/a/9116735/732596
+    timestamps = np.ascontiguousarray(timestamps, dtype=DTYPE)
+    powers = np.ascontiguousarray(powers, dtype=np.float32)
+
+    load_data(filename, n_lines, &timestamps[0], &powers[0])
+
+    dti = pd.DatetimeIndex(timestamps, tz='Europe/London')
+
+    return pd.Series(powers, index=dti)

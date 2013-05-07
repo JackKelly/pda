@@ -79,11 +79,13 @@ std::list<std::pair<npy_float64, npy_float64> > load_list(std::string filename)
     return data;
 }
 
-void load_data(std::string filename, int size, npy_uint64* array)
+void load_data(std::string filename, int size,
+               npy_uint64* timestamps, npy_float32* powers)
 {
     std::fstream fs;
     char ch;
-    double timestamp, power;
+    double timestamp;
+    npy_float32 power;
     fs.open(filename.c_str(), std::fstream::in);
 
     size_t i=0;    
@@ -92,7 +94,8 @@ void load_data(std::string filename, int size, npy_uint64* array)
         if (isdigit(ch)) {
             fs >> timestamp;
             fs >> power;
-            array[i] = static_cast<npy_uint64>(timestamp * 1000000000);
+            timestamps[i] = static_cast<npy_uint64>(timestamp * 1000000000);
+            powers[i] = power;
             i++;
             if (i > size) {
                 break;

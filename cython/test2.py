@@ -29,9 +29,5 @@ t.time()
 d = load_redd.load()
 t.time('load redd')
 
-dti = pd.DatetimeIndex(d, tz='Europe/London')
-t.time('convert to DatetimeIndex')
-
 print(t)
-
-print(dti)
+print(d)
