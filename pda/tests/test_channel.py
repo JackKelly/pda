@@ -30,9 +30,8 @@ class TestChannel(unittest.TestCase):
         target_on_duration = 86394 / SECS_PER_HOUR
         c.series = pd.Series(100, index=idx)
         c.sample_period = 6
-        df = c.on_duration_per_day()
-        self.assertEqual(df['on_duration'][0], target_on_duration)
-        self.assertEqual(df['sample_size'][0], 86400/6)
+        on = c.on_duration_per_day()
+        self.assertEqual(on[0], target_on_duration)
         
         # c.series.plot()
         # plt.show()

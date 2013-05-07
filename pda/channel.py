@@ -26,12 +26,15 @@ class Channel(object):
         sample_period (float)
     """
     
-    def __init__(self, filename=None, timezone=DEFAULT_TIMEZONE,
+    def __init__(self, filename=None, 
+                 timezone=DEFAULT_TIMEZONE,
                  sample_period=None, # seconds
-                 max_sample_period=20 # seconds
+                 max_sample_period=20, # seconds
+                 name=''
                  ):
         self.max_sample_period = max_sample_period
         self.sample_period = sample_period
+        self.name = name
         if filename is not None:
             self.load(filename, timezone)
         
@@ -73,9 +76,8 @@ class Channel(object):
             tz_convert (str): (optional) Use 'midnight' in this timezone.
             
         Returns:
-            pd.DataFrame.  One row per day.  Columns:
-                on_duration (np.float): hours
-                sample_size (np.int64): number of samples per day
+            pd.Series.  One row per day.  data is (np.float): hours
+                name (str): set to the same name as self + ' hours on'
         """
         
         assert(0 <= acceptable_dropout_rate <= 1)
@@ -89,8 +91,8 @@ class Channel(object):
         # at midnight.
         rng = pd.date_range(series.index[0], series.index[-1],
                             freq='D', normalize=True)
-        on_durations = pd.Series(   index=rng, dtype=np.float)
-        sample_sizes = pd.Series(0, index=rng, dtype=np.int64)
+        on_durations = pd.Series(index=rng, dtype=np.float,
+                                 name=self.name+' hours on')
 
         max_samples_per_day = SECS_PER_DAY / self.sample_period
         min_samples_per_day = max_samples_per_day * (1-acceptable_dropout_rate)
@@ -133,10 +135,5 @@ class Channel(object):
             timedeltas[timedeltas > max_sample_period] = max_sample_period
             on_durations[day] = (timedeltas.sum().astype('timedelta64[s]')
                                  .astype(np.int64) / SECS_PER_HOUR)
-            sample_sizes[day] = data_for_day.size
 
-        df = pd.DataFrame({'on_duration':on_durations,
-                           'sample_size':sample_sizes})
-
-        return df.dropna()
-
+        return on_durations.dropna()
