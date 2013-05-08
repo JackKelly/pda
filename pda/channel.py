@@ -67,6 +67,9 @@ class Channel(object):
             between samples. If data is missing for longer than
             max_sample_period then the appliance is assumed to be off.
         sample_period (float)
+        acceptable_dropout_period (float): [0, 1]
+        on_power_threshold (float): watts
+        name (str)
     """
     
     def __init__(self, 
