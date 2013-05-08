@@ -16,6 +16,7 @@ print("Opening power data...")
 #             versus max_temp  R^2 = 0.432,
 #             versus min_temp  R^2 = 0.212)
 # 3 = solar (R^2 = 0.798)
+
 power = Channel('/data/mine/vadeec/jack-merged/channel_8.dat',
                 name='boiler')
 

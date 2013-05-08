@@ -4,6 +4,7 @@ import numpy as np
 import datetime as dt
 import scipy.stats as stats
 import load_pwr_data
+import os
 
 """
 REQUIREMENTS:
@@ -66,7 +67,7 @@ class Channel(object):
         return s
 
     def on_duration_per_day(self, pwr_threshold=5, acceptable_dropout_rate=0.2,
-                            tz_convert=None):
+                            tz_convert=None, verbose=False):
         """
         Args:
             pwr_threshold (float or int): Optional. Threshold which defines the
@@ -117,17 +118,19 @@ class Channel(object):
                                         < rng[day_i+1])[0]
             day = rng[day_i]
             if indicies_for_day.size == 0:
-                print("No data available for   ", day.strftime('%Y-%m-%d'))
+                if verbose:
+                    print("No data available for   ", day.strftime('%Y-%m-%d'))
                 continue
             data_for_day = unprocessed_data[indicies_for_day]
             unprocessed_data = unprocessed_data[indicies_for_day[-1]+1:]
             if data_for_day.size < min_samples_per_day:
-                print("Insufficient samples for", day.strftime('%Y-%m-%d'),
-                      "; samples =", data_for_day.size,
-                      "dropout_rate = {:.2%}".format(1 - (data_for_day.size / 
-                                                          max_samples_per_day)))
-                print("                 start =", data_for_day.index[0])
-                print("                   end =", data_for_day.index[-1])
+                if verbose:
+                    print("Insufficient samples for", day.strftime('%Y-%m-%d'),
+                          "; samples =", data_for_day.size,
+                          "dropout_rate = {:.2%}".format(1 - (data_for_day.size / 
+                                                              max_samples_per_day)))
+                    print("                 start =", data_for_day.index[0])
+                    print("                   end =", data_for_day.index[-1])
                 continue
             i_above_threshold = np.where(data_for_day[:-1] >= pwr_threshold)[0]
             timedeltas = (data_for_day.index[i_above_threshold+1].values -

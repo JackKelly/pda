@@ -1,5 +1,5 @@
 from pda.channel import Channel
-from os.path import join
+from os.path import join, exists
 
 
 def load_labels(filename):
@@ -38,6 +38,11 @@ def load_dataset(data_dir):
     labels = load_labels(join(data_dir, 'labels.dat'))
     for chan, label in labels.iteritems():
         chan_filename = join(data_dir, 'channel_{:d}.dat'.format(chan))
-        channels.append(Channel(chan_filename, name=label))
+        try:
+            channels.append(Channel(chan_filename, name=label))
+        except IOError:
+            pass
+        else:
+            print("loaded chan {} {}".format(chan, label))
 
     return channels

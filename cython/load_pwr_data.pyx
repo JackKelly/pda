@@ -17,7 +17,7 @@ from libcpp.string cimport string
 import numpy as np
 cimport numpy as np
 import pandas as pd
-from os.path import join
+from os.path import join, exists
 
 # Data types for timestamps (TS = TimeStamp)
 TS_DTYPE = np.uint64
@@ -43,6 +43,9 @@ def load(filename, tz='Europe/London'):
     Returns:
         pd.Series
     """
+
+    if not exists(filename):
+        raise IOError('{} does not exist!'.format(filename))
 
     # Declare C types
     cdef np.ndarray[TS_DTYPE_t, ndim=1, mode='c'] timestamps
