@@ -18,18 +18,20 @@ print("Opening power data...")
 #             versus min_temp  R^2 = 0.212)
 # 3 = solar (R^2 = 0.798)
 
-dataset = ds.load_dataset('/data/mine/vadeec/jack-merged/')
-# dataset = ds.load_dataset('/data/mine/vadeec/jack/137')
+
+# DATA_DIR = '/data/mine/vadeec/jack-merged/'
+DATA_DIR  = '/data/mine/vadeec/jack/137'
+
+print("Loading dataset...")
+dataset = ds.load_dataset(DATA_DIR)
 
 print("Calculating on durations per day for each channel...")
-
 for i in range(len(dataset)):
-    print("Loading on durations for", dataset[i].name)
-    dataset[i].on_durations = dataset[i].on_duration_per_day(tz_convert='UTC', 
-                                                             pwr_threshold=20)
-
+    name = dataset[i].name
+    print("Loading on durations for", name)
+    dataset[i].on_durations = dataset[i].on_duration_per_day(tz_convert='UTC')
     print("Got {} days of data from on_duration_per_day for {}."
-          .format(dataset[i].on_durations.size, dataset[i].name))
+          .format(dataset[i].on_durations.size, name))
 
 # Create a matrix for storing correlation results in
 results = np.zeros([len(dataset), len(weather.columns)])
@@ -37,17 +39,22 @@ results = np.zeros([len(dataset), len(weather.columns)])
 fig = plt.figure()
 ax = fig.add_subplot(111)
 
-threshold = 0.1
+ON_DURATION_THRESHOLD = 0.1 # hours
+MIN_DAYS_PER_CHAN = 1
 for i_d in range(len(dataset)):
     for i_w in range(len(weather.columns)):
         print(dataset[i_d].name, weather.columns[i_w])
         on_durations = dataset[i_d].on_durations
-#        on_durations = on_durations[on_durations > threshold]
-        if on_durations.size > 10:
-            ax, results[i_d][i_w] = pda.stats.correlate(weather.ix[:,i_w], 
-                                                        on_durations, ax)
+        on_durations = on_durations[on_durations > ON_DURATION_THRESHOLD]
+        if on_durations.size > MIN_DAYS_PER_CHAN:
+            try:
+                ax, results[i_d][i_w] = pda.stats.correlate(weather.ix[:,i_w], 
+                                                            on_durations, ax)
+            except IndexError as e:
+                print(str(e))
+                print(dataset[i_d].name, "has insufficient data")
 
-# TODO: 
+# TODO:
 # display a heatmap
 # only display top N appliances in heatmap (take the max of each row?)
 # don't require axes in correlate()
