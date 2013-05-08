@@ -19,7 +19,7 @@ ACCEPTABLE_DROPOUT_RATE_IF_NOT_UNPLUGGED = 0.2
 
 # Threshold between "on" and "off" in watts. Will be overridden if
 # data_dir contains a "custom_on_power_thresholds.dat" file
-DEFAULT_ON_POWER_THRESHOLD = 10
+DEFAULT_ON_POWER_THRESHOLD = 3
 
 
 def load_labels(data_dir):
@@ -105,8 +105,8 @@ class Channel(object):
         self.name = labels.get(self.chan, "")
 
         # load sometimes_unplugged file
-        if self.name in load_sometimes_unplugged(self.data_dir):
-            self.acceptable_dropout_rate = ACCEPTABLE_DROPOUT_RATE_IF_SOMETIMES_UNPLUGGED 
+#        if self.name in load_sometimes_unplugged(self.data_dir):
+#            self.acceptable_dropout_rate = ACCEPTABLE_DROPOUT_RATE_IF_SOMETIMES_UNPLUGGED 
 
         # load custom on power thresholds
         opt_filename = os.path.join(self.data_dir, 
