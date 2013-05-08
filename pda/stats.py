@@ -19,12 +19,14 @@ def correlate(x, y, ax, xlabel='', ylabel=''):
     # plot linear regression line
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
-    ax.plot(xlim, [intercept, intercept+(xlim[1]*slope)], 'k-')
+    ax.plot(xlim, [intercept+(xlim[0]*slope), intercept+(xlim[1]*slope)], 'k-')
     ax.annotate('$R^2 = {:.3f}$\n'
                 '$n = {:d}$'
                 .format(r_value**2, x_aligned.size),
                 ((xlim[1]-xlim[0])*0.8 + xlim[0],
                  (ylim[1]-ylim[0])*0.8))
     ax.set_ylim((0, ylim[1]))
+
+    print("p={:.9f}".format(1-p_value))
 
     return ax, r_value**2

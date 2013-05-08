@@ -16,8 +16,8 @@ print("Opening power data...")
 #             versus max_temp  R^2 = 0.432,
 #             versus min_temp  R^2 = 0.212)
 # 3 = solar (R^2 = 0.798)
-power = Channel('/data/mine/vadeec/jack-merged/channel_2.dat',
-                name='boiler')
+power = Channel('/data/mine/vadeec/jack-merged/channel_9.dat',
+                name='htpc')
 
 print("Calculating...")
 on = power.on_duration_per_day(tz_convert='UTC', pwr_threshold=20)
