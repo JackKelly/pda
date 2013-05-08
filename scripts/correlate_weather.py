@@ -28,7 +28,8 @@ print("Plotting...")
 fig = plt.figure()
 ax = fig.add_subplot(111)
 
-ax, r_squared = pda.stats.correlate(weather.max_temp, on, ax)
+threshold = 0.1
+ax, r_squared = pda.stats.correlate(weather.max_temp, on[on > threshold], ax)
 
 print("R^2={:.3f}".format(r_squared))
 plt.show()
