@@ -145,7 +145,7 @@ class Channel(object):
         s += "     mode power = {:>7.1f}W\n".format(stats.mode(self.series)[0][0])
         return s        
 
-    def on_duration_per_day(self, tz_convert=None, verbose=False):
+    def usage_per_day(self, tz_convert=None, verbose=False):
         """
         Args:
             tz_convert (str): (optional) Use 'midnight' in this timezone.
@@ -158,8 +158,10 @@ class Channel(object):
                 row which has a worse dropout rate.
 
         Returns:
-            pd.Series.  One row per day.  data is (np.float): hours
-                name (str): set to the same name as self + ' hours on'
+            pd.DataFrame.  One row per day.  data is (np.float)
+                Series:
+                     hours_on
+                     kwh
         """
         
         assert(0 <= self.acceptable_dropout_rate <= 1)
@@ -171,8 +173,10 @@ class Channel(object):
         # at midnight.
         rng = pd.date_range(series.index[0], series.index[-1],
                             freq='D', normalize=True)
-        on_durations = pd.Series(index=rng, dtype=np.float,
+
+        hours_on = pd.Series(index=rng, dtype=np.float,
                                  name=self.name+' hours on')
+        kwhs = pd.Series(index=rng, dtype=np.float, name=self.name+' kWh')
 
         max_samples_per_day = SECS_PER_DAY / self.sample_period
         min_samples_per_day = max_samples_per_day * (1-self.acceptable_dropout_rate)
@@ -213,10 +217,24 @@ class Channel(object):
                 continue
             i_above_threshold = np.where(data_for_day[:-1] >= 
                                          self.on_power_threshold)[0]
-            timedeltas = (data_for_day.index[i_above_threshold+1].values -
-                          data_for_day.index[i_above_threshold].values)
-            timedeltas[timedeltas > max_sample_period] = max_sample_period
-            on_durations[day] = (timedeltas.sum().astype('timedelta64[s]')
+            td_above_thresh = (data_for_day.index[i_above_threshold+1].values -
+                               data_for_day.index[i_above_threshold].values)
+            td_above_thresh[td_above_thresh > max_sample_period] = max_sample_period
+            hours_on[day] = (td_above_thresh.sum().astype('timedelta64[s]')
                                  .astype(np.int64) / SECS_PER_HOUR)
 
-        return on_durations.dropna()
+            # Calculate kWh per day
+            td = np.diff(data_for_day.index.values.astype(np.int64)) / 1E9
+            td_limited = np.where(td > self.max_sample_period,
+                                  self.max_sample_period, td)
+            watt_seconds = (td_limited * data_for_day.values[:-1]).sum()
+            kwhs[day] = watt_seconds / 3600000
+
+        return pd.DataFrame({'hours_on': hours_on.dropna(),
+                             'kwh': kwhs.dropna()})
+
+    def kwh(self):
+        dt_limited = np.where(self._dt>self.max_sample_period, 
+                              self.max_sample_period, self._dt)
+        watt_seconds = (dt_limited * self.data['watts'][:-1]).sum()
+        return watt_seconds / 3600000

@@ -60,8 +60,9 @@ class TestChannel(unittest.TestCase):
         target_on_duration = 86394 / SECS_PER_HOUR
         c.series = pd.Series(100, index=idx)
         c.sample_period = 6
-        on = c.on_duration_per_day()
-        self.assertEqual(on[0], target_on_duration)
+        on = c.usage_per_day()
+        self.assertEqual(on.on_duration[0], target_on_duration)
+        self.assertAlmostEqual(on.kwh[0], 2.4, places=3)
         
         # c.series.plot()
         # plt.show()
@@ -76,8 +77,8 @@ class TestChannel(unittest.TestCase):
         c = Channel(SMALL_TEST_DATA_PATH, 4)
         self.assertEqual(c.name, 'laptop')
         self.assertEqual(c.on_power_threshold, DEFAULT_ON_POWER_THRESHOLD)
-        self.assertEqual(c.acceptable_dropout_rate, 
-                         ACCEPTABLE_DROPOUT_RATE_IF_SOMETIMES_UNPLUGGED)
+#        self.assertEqual(c.acceptable_dropout_rate, 
+#                         ACCEPTABLE_DROPOUT_RATE_IF_SOMETIMES_UNPLUGGED)
 
 if __name__ == '__main__':
     unittest.main()
