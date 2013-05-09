@@ -24,7 +24,7 @@ print("Opening power data...")
 power = Channel('/data/mine/vadeec/jack-merged/', 25)
 
 print("Calculating...")
-# power.on_power_threshold = 3
+power.on_power_threshold = 20
 on = power.on_duration_per_day(tz_convert='UTC')
 print("Got {} days of data from on_duration_per_day.".format(on.size))
 
