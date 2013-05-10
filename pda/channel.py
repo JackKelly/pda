@@ -1,7 +1,6 @@
 from __future__ import print_function, division
 import pandas as pd
 import numpy as np
-import datetime as dt
 import scipy.stats as stats
 import load_pwr_data
 import os
@@ -14,7 +13,7 @@ REQUIREMENTS:
 SECS_PER_HOUR = 3600
 SECS_PER_DAY = 86400
 DEFAULT_TIMEZONE = 'Europe/London'
-ACCEPTABLE_DROPOUT_RATE_IF_SOMETIMES_UNPLUGGED = 1.0
+ACCEPTABLE_DROPOUT_RATE_IF_SOMETIMES_UNPLUGGED = 0.9
 ACCEPTABLE_DROPOUT_RATE_IF_NOT_UNPLUGGED = 0.2
 
 # Threshold between "on" and "off" in watts. Will be overridden if
@@ -108,8 +107,8 @@ class Channel(object):
         self.name = labels.get(self.chan, "")
 
         # load sometimes_unplugged file
-#        if self.name in load_sometimes_unplugged(self.data_dir):
-#            self.acceptable_dropout_rate = ACCEPTABLE_DROPOUT_RATE_IF_SOMETIMES_UNPLUGGED 
+        if self.name in load_sometimes_unplugged(self.data_dir):
+            self.acceptable_dropout_rate = ACCEPTABLE_DROPOUT_RATE_IF_SOMETIMES_UNPLUGGED 
 
         # load custom on power thresholds
         opt_filename = os.path.join(self.data_dir, 
@@ -171,12 +170,12 @@ class Channel(object):
 
         # Construct the index for the output.  Each item is a Datetime
         # at midnight.
-        rng = pd.date_range(series.index[0], series.index[-1],
-                            freq='D', normalize=True)
-
-        hours_on = pd.Series(index=rng, dtype=np.float,
-                                 name=self.name+' hours on')
-        kwhs = pd.Series(index=rng, dtype=np.float, name=self.name+' kWh')
+        index = pd.date_range(series.index[0], series.index[-1],
+                              freq='D', normalize=True)
+        hours_on = pd.Series(index=index, dtype=np.float, 
+                             name=self.name+' hours on')
+        kwh = pd.Series(index=index, dtype=np.float, 
+                        name=self.name+' kWh')
 
         max_samples_per_day = SECS_PER_DAY / self.sample_period
         min_samples_per_day = max_samples_per_day * (1-self.acceptable_dropout_rate)
@@ -184,7 +183,7 @@ class Channel(object):
         max_samples_per_2days = max_samples_per_day * 2
 
         unprocessed_data = series.copy()
-        for day_i in range(rng.size-1):
+        for day_i in range(index.size-1):
             # The simplest way to get data for just a single day is to use
             # data_for_day = series[day.strftime('%Y-%m-%d')]
             # but this takes about 300ms per call on my machine.
@@ -198,8 +197,8 @@ class Channel(object):
             #    max_samples_per_2days. We only search through a small subset
             #    of the available data.
             indicies_for_day = np.where(unprocessed_data.index[:max_samples_per_2days] 
-                                        < rng[day_i+1])[0]
-            day = rng[day_i]
+                                        < index[day_i+1])[0]
+            day = index[day_i]
             if indicies_for_day.size == 0:
                 if verbose:
                     print("No data available for   ", day.strftime('%Y-%m-%d'))
@@ -228,10 +227,10 @@ class Channel(object):
             td_limited = np.where(td > self.max_sample_period,
                                   self.max_sample_period, td)
             watt_seconds = (td_limited * data_for_day.values[:-1]).sum()
-            kwhs[day] = watt_seconds / 3600000
+            kwh[day] = watt_seconds / 3600000
 
         return pd.DataFrame({'hours_on': hours_on.dropna(),
-                             'kwh': kwhs.dropna()})
+                             'kwh': kwh.dropna()})
 
     def kwh(self):
         dt_limited = np.where(self._dt>self.max_sample_period, 
