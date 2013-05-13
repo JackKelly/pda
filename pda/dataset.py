@@ -1,4 +1,6 @@
+from __future__ import print_function, division
 from pda.channel import Channel, load_labels
+import sys
 
 def load_dataset(data_dir):
     """Loads an entire dataset directory.
@@ -12,13 +14,16 @@ def load_dataset(data_dir):
 
     channels = []
     labels = load_labels(data_dir)
+    print("Found", len(labels), "entries in labels.dat")
     for chan, label in labels.iteritems():
+        print("Attempting to load chan", chan, label, "...", end=" ")
+        sys.stdout.flush()
         try:
             channels.append(Channel(data_dir, chan))
         except IOError:
-            pass
+            print("FAILED!")
         else:
-            print("loaded chan {} {}".format(chan, label))
+            print("success.")
 
     return channels
 
