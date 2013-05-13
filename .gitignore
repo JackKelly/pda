@@ -5,10 +5,9 @@
 *.log
 profile.txt
 *.so
+*.h5
 
 build/
 *.egg-info/
 dist/
 .ropeproject/
-
-
