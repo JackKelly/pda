@@ -272,7 +272,8 @@ class Channel(object):
                 e.g.
                 [(0,100), (101, 200)]
         """
-        series = tz_converted_series if tz_converted_series else self.series
+        series = (self.series if tz_converted_series is None 
+                  else tz_converted_series)
         date_index = pd.date_range(series.index[0], series.index[-1],
                                    freq='D', normalize=True)
 
