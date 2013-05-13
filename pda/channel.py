@@ -8,6 +8,7 @@ import os
 """
 REQUIREMENTS:
   pandas >= 0.11.0
+  pytables (sudo apt-get install python-tables)
 """
 
 SECS_PER_HOUR = 3600
@@ -61,7 +62,7 @@ class Channel(object):
     A single channel of data.
     
     Attributes:
-        series (pd.series): the power data in Watts.
+        series (pd.Series): the power data in Watts.
         max_sample_period (float): The maximum time allowed
             between samples. If data is missing for longer than
             max_sample_period then the appliance is assumed to be off.
@@ -69,6 +70,8 @@ class Channel(object):
         acceptable_dropout_period (float): [0, 1]
         on_power_threshold (float): watts
         name (str)
+        data_dir (str)
+        chan (int): channel number
     """
     
     def __init__(self, 
@@ -78,28 +81,68 @@ class Channel(object):
                  sample_period=None, # seconds
                  max_sample_period=20, # seconds
                  ):
-        self.name = ""
-        self.acceptable_dropout_rate = ACCEPTABLE_DROPOUT_RATE_IF_NOT_UNPLUGGED
-        self.on_power_threshold = DEFAULT_ON_POWER_THRESHOLD
+        self.data_dir = data_dir
+        self.chan = chan
         self.sample_period = sample_period
         self.max_sample_period = max_sample_period
+
+        self.name = ""
+        self.series = None
+        self.acceptable_dropout_rate = ACCEPTABLE_DROPOUT_RATE_IF_NOT_UNPLUGGED
+        self.on_power_threshold = DEFAULT_ON_POWER_THRESHOLD
+
         if data_dir is not None and chan is not None:
             self.load(data_dir, chan, timezone)
+
+    def get_filename(self, data_dir=None, suffix='dat'):
+        data_dir = data_dir if data_dir else self.data_dir
+        return os.path.join(data_dir, 'channel_{:d}.{:s}'.format(self.chan, 
+                                                                 suffix))
         
     def load(self, 
              data_dir, # str
              chan, # int
              timezone=DEFAULT_TIMEZONE # str
              ):
+        """Load power data.  If an HDF5 (.h5) file exists for this channel
+        and if that .h5 file is newer than the corresponding .dat file then
+        the .h5 file will be loaded.  Else the .dat file will be loaded and
+        and .h5 will be created.
+        """
+
         self.data_dir = data_dir
         self.chan = chan
         self.load_metadata()
-        filename = os.path.join(data_dir, 'channel_{:d}.dat'.format(chan))
-        self.series = load_pwr_data.load(filename, tz=timezone)
+        
+        dat_filename = self.get_filename()
+        hdf5_filename = self.get_filename(suffix='h5')
+        if (os.path.exists(hdf5_filename) and 
+            os.path.getmtime(hdf5_filename) > os.path.getmtime(dat_filename)):
+            store = pd.HDFStore(hdf5_filename)
+            self.series = store['series']
+            store.close()
+        else:
+            self.series = load_pwr_data.load(dat_filename, tz=timezone)
+            self.save()
+
         if self.sample_period is None:
-            fwd_diff = np.diff(self.series.index.values).astype(np.float)
+            # Find the sample period by finding the stats.mode of the 
+            # forward difference.  Only use the first 100 samples (for speed).
+            fwd_diff = np.diff(self.series.index.values[:100]).astype(np.float)
             mode_fwd_diff = int(round(stats.mode(fwd_diff)[0][0]))
             self.sample_period = mode_fwd_diff / 1E9
+
+    def save(self, data_dir=None):
+        """Saves self.series to data_dir/channel_<chan>.h5
+
+        Args:
+            data_dir (str): optional.  If provided then save hdf5 file to this
+            data directory.  If not provided then use self.data_dir.
+        """
+        hdf5_filename = self.get_filename(data_dir, suffix='h5')
+        store = pd.HDFStore(hdf5_filename)
+        store['series'] = self.series
+        store.close()
 
     def load_metadata(self):
         # load labels file
