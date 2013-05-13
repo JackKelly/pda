@@ -123,6 +123,7 @@ class Channel(object):
             store.close()
         else:
             self.series = load_pwr_data.load(dat_filename, tz=timezone)
+            self.series = self.series.sort_index() # MIT REDD data isn't always in order
             self.save()
 
         if self.sample_period is None:
@@ -211,49 +212,32 @@ class Channel(object):
         series = (self.series if tz_convert is None else
                   self.series.tz_convert(tz_convert))
 
-        # Construct the index for the output.  Each item is a Datetime
+        # Construct the date_index for the output.  Each item is a Datetime
         # at midnight.
-        index = pd.date_range(series.index[0], series.index[-1],
-                              freq='D', normalize=True)
-        hours_on = pd.Series(index=index, dtype=np.float, 
+        date_index, day_boundaries = self.days(series)
+        hours_on = pd.Series(index=date_index, dtype=np.float, 
                              name=self.name+' hours on')
-        kwh = pd.Series(index=index, dtype=np.float, 
+        kwh = pd.Series(index=date_index, dtype=np.float, 
                         name=self.name+' kWh')
 
-        max_samples_per_day = SECS_PER_DAY / self.sample_period
-        min_samples_per_day = max_samples_per_day * (1-self.acceptable_dropout_rate)
-        max_sample_period = np.timedelta64(self.max_sample_period, 's')
-        max_samples_per_2days = max_samples_per_day * 2
+        MAX_SAMPLES_PER_DAY = SECS_PER_DAY / self.sample_period
+        MIN_SAMPLES_PER_DAY = MAX_SAMPLES_PER_DAY * (1-self.acceptable_dropout_rate)
+        MAX_SAMPLE_PERIOD = np.timedelta64(self.max_sample_period, 's')
 
-        unprocessed_data = series.copy()
-        for day_i in range(index.size-1):
-            # The simplest way to get data for just a single day is to use
-            # data_for_day = series[day.strftime('%Y-%m-%d')]
-            # but this takes about 300ms per call on my machine.
-            # So we take advantage of several features of the data to achieve
-            # a 300x speedup:
-            # 1. We use the fact that the data is sorted by date, hence 
-            #    we can chomp through it in order.  The variable
-            #    unprocessed_data stores the data still to be processed.
-            # 2. max_samples_per_day sets an upper bound on the number of
-            #    datapoints per day.  The code is conservative and uses 
-            #    max_samples_per_2days. We only search through a small subset
-            #    of the available data.
-            indicies_for_day = np.where(unprocessed_data.index[:max_samples_per_2days] 
-                                        < index[day_i+1])[0]
-            day = index[day_i]
-            if indicies_for_day.size == 0:
+        for day_i in range(date_index.size-1):
+            day_start_index, day_end_index = day_boundaries[day_i]
+            day = date_index[day_i]
+            if day_start_index is None:
                 if verbose:
                     print("No data available for   ", day.strftime('%Y-%m-%d'))
                 continue
-            data_for_day = unprocessed_data[indicies_for_day]
-            unprocessed_data = unprocessed_data[indicies_for_day[-1]+1:]
-            if data_for_day.size < min_samples_per_day:
+            data_for_day = series[day_start_index:day_end_index]
+            if data_for_day.size < MIN_SAMPLES_PER_DAY:
                 if verbose:
                     print("Insufficient samples for", day.strftime('%Y-%m-%d'),
                           "; samples =", data_for_day.size,
                           "dropout_rate = {:.2%}".format(1 - (data_for_day.size / 
-                                                              max_samples_per_day)))
+                                                              MAX_SAMPLES_PER_DAY)))
                     print("                 start =", data_for_day.index[0])
                     print("                   end =", data_for_day.index[-1])
                 continue
@@ -261,7 +245,7 @@ class Channel(object):
                                          self.on_power_threshold)[0]
             td_above_thresh = (data_for_day.index[i_above_threshold+1].values -
                                data_for_day.index[i_above_threshold].values)
-            td_above_thresh[td_above_thresh > max_sample_period] = max_sample_period
+            td_above_thresh[td_above_thresh > MAX_SAMPLE_PERIOD] = MAX_SAMPLE_PERIOD
             hours_on[day] = (td_above_thresh.sum().astype('timedelta64[s]')
                                  .astype(np.int64) / SECS_PER_HOUR)
 
@@ -274,6 +258,54 @@ class Channel(object):
 
         return pd.DataFrame({'hours_on': hours_on.dropna(),
                              'kwh': kwh.dropna()})
+
+    def days(self, tz_converted_series=None):
+        """
+        Args:
+            tz_converted_series (pd.Series): optional.  Defaults to self.series
+
+        Returns: date_index, list_of_indicies
+            date_index (pd.tseries.index.DatetimeIndex): each row is a say
+            day_boundaries (list of 2-tuples of ints): 
+                [(start index for day date_index[0], end index),
+                 (start index for day date_index[1], end index), ...]
+                e.g.
+                [(0,100), (101, 200)]
+        """
+        series = tz_converted_series if tz_converted_series else self.series
+        date_index = pd.date_range(series.index[0], series.index[-1],
+                                   freq='D', normalize=True)
+
+        MAX_SAMPLES_PER_DAY = SECS_PER_DAY / self.sample_period
+        MAX_SAMPLES_PER_2_DAYS = MAX_SAMPLES_PER_DAY * 2
+
+        n_rows_processed = 0
+        day_boundaries = []
+        for day_i in range(date_index.size-1):
+            # The simplest way to get data for just a single day is to use
+            # data_for_day = series[day.strftime('%Y-%m-%d')]
+            # but this takes about 300ms per call on my machine.
+            # So we take advantage of several features of the data to achieve
+            # a 300x speedup:
+            # 1. We use the fact that the data is sorted in order, hence 
+            #    we can chomp through it in order.
+            # 2. MAX_SAMPLES_PER_DAY sets an upper bound on the number of
+            #    datapoints per day.  The code is conservative and uses 
+            #    MAX_SAMPLES_PER_2_DAYS. We only search through a small subset
+            #    of the available data.
+            data_to_process = series.index[n_rows_processed: 
+                                           n_rows_processed+MAX_SAMPLES_PER_2_DAYS]
+            indicies_for_day = np.where(data_to_process < date_index[day_i+1])[0]
+            if indicies_for_day.size == 0:
+                day_boundaries.append((None, None))
+            else:
+                day_start_index = indicies_for_day[0] + n_rows_processed
+                day_end_index = indicies_for_day[-1] + n_rows_processed + 1
+                day_boundaries.append((day_start_index, day_end_index))
+                n_rows_processed += day_end_index - day_start_index
+
+        return date_index, day_boundaries
+        
 
     def kwh(self):
         dt_limited = np.where(self._dt>self.max_sample_period, 
