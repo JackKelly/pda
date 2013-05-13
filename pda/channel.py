@@ -222,7 +222,6 @@ class Channel(object):
 
         MAX_SAMPLES_PER_DAY = SECS_PER_DAY / self.sample_period
         MIN_SAMPLES_PER_DAY = MAX_SAMPLES_PER_DAY * (1-self.acceptable_dropout_rate)
-        MAX_SAMPLE_PERIOD = np.timedelta64(self.max_sample_period, 's')
 
         for day_i in range(date_index.size-1):
             day_start_index, day_end_index = day_boundaries[day_i]
@@ -241,23 +240,44 @@ class Channel(object):
                     print("                 start =", data_for_day.index[0])
                     print("                   end =", data_for_day.index[-1])
                 continue
-            i_above_threshold = np.where(data_for_day[:-1] >= 
-                                         self.on_power_threshold)[0]
-            td_above_thresh = (data_for_day.index[i_above_threshold+1].values -
-                               data_for_day.index[i_above_threshold].values)
-            td_above_thresh[td_above_thresh > MAX_SAMPLE_PERIOD] = MAX_SAMPLE_PERIOD
-            hours_on[day] = (td_above_thresh.sum().astype('timedelta64[s]')
-                                 .astype(np.int64) / SECS_PER_HOUR)
-
-            # Calculate kWh per day
-            td = np.diff(data_for_day.index.values.astype(np.int64)) / 1E9
-            td_limited = np.where(td > self.max_sample_period,
-                                  self.max_sample_period, td)
-            watt_seconds = (td_limited * data_for_day.values[:-1]).sum()
-            kwh[day] = watt_seconds / 3600000
+            
+            hours_on[day] = self.hours_on(data_for_day)
+            kwh[day] = self.kwh(data_for_day)
 
         return pd.DataFrame({'hours_on': hours_on.dropna(),
                              'kwh': kwh.dropna()})
+
+    def hours_on(self, series=None):
+        """Returns a float representing the number of hours this channel
+        has been above threshold.
+
+        Args:
+           series (pd.Series): optional.  Defaults to self.series
+        """
+        MAX_SAMPLE_PERIOD = np.timedelta64(self.max_sample_period, 's')
+        series = self.series if series is None else series
+        i_above_threshold = np.where(series[:-1] >= 
+                                     self.on_power_threshold)[0]
+        td_above_thresh = (series.index[i_above_threshold+1].values -
+                           series.index[i_above_threshold].values)
+        td_above_thresh[td_above_thresh > MAX_SAMPLE_PERIOD] = MAX_SAMPLE_PERIOD
+
+        secs_on = td_above_thresh.sum().astype('timedelta64[s]').astype(np.int64)
+        return secs_on / SECS_PER_HOUR
+
+    def kwh(self, series=None):
+        """Returns a float representing the number of kilowatt hours (kWh) this 
+        channel consumed.
+
+        Args:
+           series (pd.Series): optional.  Defaults to self.series
+        """
+        series = self.series if series is None else series
+        td = np.diff(series.index.values.astype(np.int64)) / 1E9
+        td_limited = np.where(td > self.max_sample_period,
+                              self.max_sample_period, td)
+        watt_seconds = (td_limited * series.values[:-1]).sum()
+        return watt_seconds / 3600000
 
     def days(self, tz_converted_series=None):
         """
@@ -306,10 +326,3 @@ class Channel(object):
                 n_rows_processed += day_end_index - day_start_index
 
         return date_index, day_boundaries
-        
-
-    def kwh(self):
-        dt_limited = np.where(self._dt>self.max_sample_period, 
-                              self.max_sample_period, self._dt)
-        watt_seconds = (dt_limited * self.data['watts'][:-1]).sum()
-        return watt_seconds / 3600000
