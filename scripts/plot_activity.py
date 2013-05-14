@@ -2,6 +2,7 @@
 from __future__ import print_function, division
 import matplotlib.pyplot as plt
 import pda.dataset as ds
+from pda.channel import indicies_of_periods
 import numpy as np
 from matplotlib.ticker import MultipleLocator
 import pandas as pd
@@ -23,11 +24,10 @@ for channel in dataset:
 df = pd.DataFrame(dct)
 
 # TODO:
-# put entire dateset into one big dataframe
 # then I can select time ranges once for entire dataframe
 
-date_index, day_boundaries = dataset[0].days()
-N_DAYS = date_index.size - 1
+period_range, period_boundaries = indicies_of_periods(df.index, 'D')
+N_DAYS = period_range.size - 1
 N_CHANNELS = len(dataset)
 MINS_PER_DAY = 24 * 60
 WIDTH = MINS_PER_DAY # 1 pixel per minute
@@ -37,13 +37,13 @@ data = np.zeros((HEIGHT, WIDTH), dtype=np.float)
 import ipdb; ipdb.set_trace()
 for chan_i in range(N_CHANNELS): # "chan_i" means "channel index"
     print("Loading", dataset[chan_i].name)
-    date_index, day_boundaries = dataset[chan_i].days()
+#    period_range, period_boundaries = dataset[chan_i].days()
     for day_i in range(N_DAYS):
-        day_start_index, day_end_index = day_boundaries[day_i]
+        day_start_index, day_end_index = period_boundaries[day_i]
         if day_start_index is None:
             continue
         data_for_day = dataset[chan_i].series[day_start_index:day_end_index]
-        day = date_index[day_i]
+        day = period_range[day_i]
         for minute_i in range(MINS_PER_DAY):
             t = day + DateOffset(minutes=minute_i)
             data_for_minute = dataset[chan_i].series[t.strftime('%Y-%m-%d %H:%M')]

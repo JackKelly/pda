@@ -223,31 +223,34 @@ class Channel(object):
         series = (self.series if tz_convert is None else
                   self.series.tz_convert(tz_convert))
 
-        # Construct the period_index for the output.  Each item is a Datetime
-        # at midnight.
-        period_index, period_boundaries = indicies_of_periods(series.index, freq)
-        hours_on = pd.Series(index=period_index, dtype=np.float, 
+        period_range, period_boundaries = indicies_of_periods(series.index,freq)
+        hours_on = pd.Series(index=period_range, dtype=np.float, 
                              name=self.name+' hours on')
-        kwh = pd.Series(index=period_index, dtype=np.float, 
+        kwh = pd.Series(index=period_range, dtype=np.float, 
                         name=self.name+' kWh')
 
         MAX_SAMPLES_PER_PERIOD = SECS_PER_FREQ[freq] / self.sample_period
-        MIN_SAMPLES_PER_PERIOD = (MAX_SAMPLES_PER_PERIOD * 
+        MIN_SAMPLES_PER_PERIOD = (MAX_SAMPLES_PER_PERIOD *
                                   (1-self.acceptable_dropout_rate))
 
-        for period in period_index[:-1]:
-            period_start_i, period_end_i = period_boundaries[period]
-            if period_start_i is None:
+        for period in period_range:
+            try:
+                period_start_i, period_end_i = period_boundaries[period]
+            except KeyError:
                 if verbose:
-                    print("No data available for   ", period.strftime('%Y-%m-%d'))
+                    print("No data available for   ",
+                          period.strftime('%Y-%m-%d'))
                 continue
+
             data_for_period = series[period_start_i:period_end_i]
             if data_for_period.size < MIN_SAMPLES_PER_PERIOD:
                 if verbose:
-                    print("Insufficient samples for", period.strftime('%Y-%m-%d'),
+                    dropout_rate = (1 - (data_for_period.size / 
+                                         MAX_SAMPLES_PER_PERIOD))
+                    print("Insufficient samples for",
+                          period.strftime('%Y-%m-%d'),
                           "; samples =", data_for_period.size,
-                          "dropout_rate = {:.2%}".format(1 - (data_for_period.size / 
-                                                              MAX_SAMPLES_PER_PERIOD)))
+                          "dropout_rate = {:.2%}".format(dropout_rate))
                     print("                 start =", data_for_period.index[0])
                     print("                   end =", data_for_period.index[-1])
                 continue
@@ -303,10 +306,12 @@ def indicies_of_periods(datetime_index, freq):
             'H' for hourly
             'T' for minutely
 
-    Returns: rng, period_boundaries
-        rng (pd.tseries.index.PeriodIndex)
+    Returns: period_range, period_boundaries:
 
-        period_boundaries (dict).  
+        period_range (pd.tseries.index.PeriodIndex): in the 
+            local time of datetime_index.
+
+        period_boundaries (dict):
             keys = pd.Period (in the local time of datetime_index)
             values = 2-tuples of ints: (start index, end index for period)
     """
@@ -315,21 +320,22 @@ def indicies_of_periods(datetime_index, freq):
     except AttributeError:
         TZ = None
 
+    # Generate a PeriodIndex object
+    period_range = pd.period_range(datetime_index[0], datetime_index[-1], 
+                                   freq=freq)
+
+    # Declare and initialise some constants and variables used
+    # during the loop...
+
     # Find the minimum sample period.
-    # Only use the first 100 samples (for speed).
-    fwd_diff = np.diff(datetime_index.values[:100]).astype(np.float)
-    min_fwd_diff = fwd_diff.min()
-    min_sample_period = min_fwd_diff / 1E9
-
-    # Normalise the start datetime
-    rng = pd.period_range(datetime_index[0], datetime_index[-1], freq=freq)
-
-    MAX_SAMPLES_PER_PERIOD = SECS_PER_FREQ[freq] / min_sample_period
+    # For the sake of speed, only use the first 100 samples.
+    FWD_DIFF = np.diff(datetime_index.values[:100]).astype(np.float)
+    MIN_SAMPLE_PERIOD = FWD_DIFF.min() / 1E9
+    MAX_SAMPLES_PER_PERIOD = SECS_PER_FREQ[freq] / MIN_SAMPLE_PERIOD
     MAX_SAMPLES_PER_2_PERIODS = MAX_SAMPLES_PER_PERIOD * 2
-
     n_rows_processed = 0
     period_boundaries = {}
-    for period in rng:
+    for period in period_range:
         # The simplest way to get data for just a single period is to use
         # data_for_day = datetime_index[period.strftime('%Y-%m-%d')]
         # but this takes about 300ms per call on my machine.
@@ -341,8 +347,9 @@ def indicies_of_periods(datetime_index, freq):
         #    datapoints per period.  The code is conservative and uses 
         #    MAX_SAMPLES_PER_2_PERIODS. We only search through a small subset
         #    of the available data.
-        data_to_process = datetime_index[n_rows_processed: 
-                                     n_rows_processed+MAX_SAMPLES_PER_2_PERIODS]
+        end_index = n_rows_processed+MAX_SAMPLES_PER_2_PERIODS
+        rows_to_process = datetime_index[n_rows_processed:end_index]
+
         end_time = period.end_time
         # Convert to correct timezone.  Can't use end_time.tz_convert(TZ)
         # because this chucks out loads of warnings:
@@ -351,13 +358,11 @@ def indicies_of_periods(datetime_index, freq):
         # tz_localize function (see pandas/tslib.pyx) to allow us to pass
         # warn=False to to_pydatetime().
         end_time = pd.Timestamp(end_time.to_pydatetime(warn=False), tz=TZ)
-        indicies_for_day = np.where(data_to_process < end_time)[0]
-        if indicies_for_day.size == 0:
-            period_boundaries[period] = (None, None)
-        else:
-            day_start_index = indicies_for_day[0] + n_rows_processed
-            day_end_index = indicies_for_day[-1] + n_rows_processed + 1
-            period_boundaries[period] = (day_start_index, day_end_index)
-            n_rows_processed += day_end_index - day_start_index
+        indicies_for_period = np.where(rows_to_process < end_time)[0]
+        if indicies_for_period.size > 0:
+            first_i_for_period = indicies_for_period[0] + n_rows_processed
+            last_i_for_period = indicies_for_period[-1] + n_rows_processed + 1
+            period_boundaries[period] = (first_i_for_period, last_i_for_period)
+            n_rows_processed += last_i_for_period - first_i_for_period
 
-    return rng, period_boundaries
+    return period_range, period_boundaries
