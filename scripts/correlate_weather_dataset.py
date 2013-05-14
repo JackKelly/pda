@@ -43,7 +43,7 @@ for i_d in range(len(dataset)):
     name = dataset[i_d].name
     names.append(name)
     print("Loading on durations for", name)
-    usage_per_day = dataset[i_d].usage_per_day(tz_convert='UTC')
+    usage_per_day = dataset[i_d].usage_per_period('D', tz_convert='UTC')
     print("Got {} days of data from on_duration_per_day for {}."
           .format(usage_per_day.index.size, name))
 

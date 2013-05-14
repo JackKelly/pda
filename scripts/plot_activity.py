@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import pda.dataset as ds
 import numpy as np
 from matplotlib.ticker import MultipleLocator
+import pandas as pd
 from pandas.tseries.offsets import DateOffset
 
 THRESHOLD = 0.005 # remove any days will less kwh or hours on per day
@@ -15,6 +16,7 @@ print("Loading dataset...")
 dataset = ds.load_dataset(DATA_DIR)
 
 # create pd.DataFrame of all channels
+print("Creating DataFrame...")
 dct = {}
 for channel in dataset:
     dct[channel.name] = channel.series

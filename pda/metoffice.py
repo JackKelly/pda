@@ -3,6 +3,18 @@ import pandas as pd
 import numpy as np
 
 def open_daily_xls(filename, sheet='HEATHROW'):
+    """Opens an XLS file from the UK met office.
+
+    Args:
+        filename (str)
+        sheet (str): optional.  Defaults to HEATHROW
+
+    Returns:
+        pd.DataFrame with a PeriodIndex in UTC.
+            Some columns have an additional .description field
+            used for plotting descriptions on graphs (includes some
+            LaTeX markup).
+    """
     xls = pd.ExcelFile(filename)
     df = xls.parse(sheet, skiprows=4, skip_footer=4, na_values=['n/a'], 
                    parse_dates=True, index_col=0, parse_cols=10)
@@ -28,8 +40,7 @@ def open_daily_xls(filename, sheet='HEATHROW'):
     }
     
     df = df.rename(columns=columns)
-    df = df.tz_localize('UTC')
-    df = df.asfreq('D')
+    df = df.tz_localize('UTC').to_period('D')
     
     # the rainfall column contains "tr" and "n/a".  
     # "tr" means "trace" (less than 0.05mm).  Replace "tr" with 0.04
@@ -37,7 +48,7 @@ def open_daily_xls(filename, sheet='HEATHROW'):
     df['rainfall'] = df['rainfall'].astype(np.float)
 
     for key, val in descriptions.iteritems():
-        print("renaming", key)
+        print("adding a 'description' field for", key)
         df[key].description = val
 
     return df

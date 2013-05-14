@@ -11,7 +11,7 @@ ON_DURATION_THRESHOLD = 0.1 # hours
 print("Opening metoffice data...")
 weather = metoffice.open_daily_xls('/data/metoffice/Heathrow_DailyData.xls')
 
-print("Opening power data...")
+print("Opening channel data...")
 # 25 = lighting circuit # (R^2 = 0.443)
 # 8 = kitchen lights (R^2 = 0.194)
 # 2 = boiler (versus radiation R^2 = 0.052, 
@@ -21,16 +21,17 @@ print("Opening power data...")
 # 3 = solar (R^2 = 0.798)
 # 12 = fridge vs min_temp R^2 = 0.255 (with on_power_threshold = 20)
 
-power = Channel('/data/mine/vadeec/jack-merged/', 25)
+channel = Channel('/data/mine/vadeec/jack-merged/', 25)
 
 print("Calculating...")
-power.on_power_threshold = 20
-on = power.usage_per_day(tz_convert='UTC').hours_on
-print("Got {} days of data from on_duration_per_day.".format(on.size))
+channel.on_power_threshold = 20
+hours_on = channel.usage_per_period('D', tz_convert='UTC').hours_on
+print("Got {} days of data from on_duration_per_day.".format(hours_on.size))
 
 print("Plotting...")
 
-x_aligned, y_aligned = pda.stats.align(weather.radiation, on[on > ON_DURATION_THRESHOLD])
+x_aligned, y_aligned = pda.stats.align(weather.radiation, 
+                                       hours_on[hours_on > ON_DURATION_THRESHOLD])
 print(x_aligned.description)
 slope, intercept, r_value, p_value, std_err = linregress(x_aligned.values,
                                                          y_aligned.values)

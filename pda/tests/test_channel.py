@@ -60,9 +60,9 @@ class TestChannel(unittest.TestCase):
         target_on_duration = 86394 / SECS_PER_HOUR
         c.series = pd.Series(100, index=idx)
         c.sample_period = 6
-        on = c.usage_per_day()
-        self.assertEqual(on.hours_on[0], target_on_duration)
-        self.assertAlmostEqual(on.kwh[0], 2.4, places=3)
+        usage = c.usage_per_period('D')
+        self.assertEqual(usage.hours_on[0], target_on_duration)
+        self.assertAlmostEqual(usage.kwh[0], 2.4, places=3)
         
         # c.series.plot()
         # plt.show()

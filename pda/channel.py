@@ -2,7 +2,7 @@ from __future__ import print_function, division
 import pandas as pd
 import numpy as np
 import scipy.stats as stats
-import load_pwr_data
+import pda.load_pwr_data as load_pwr_data
 import os
 
 """
@@ -21,6 +21,7 @@ ACCEPTABLE_DROPOUT_RATE_IF_NOT_UNPLUGGED = 0.2
 # data_dir contains a "custom_on_power_thresholds.dat" file
 DEFAULT_ON_POWER_THRESHOLD = 3
 
+SECS_PER_FREQ = {'T':60, 'H': 3600, 'D': 86400, 'M': 2678400, 'A': 31536000}
 
 def load_labels(data_dir):
     """Loads data from labels.dat file.
@@ -55,6 +56,16 @@ def load_sometimes_unplugged(data_dir):
     else:
         lines = file.readlines()
         return [line.strip() for line in lines if line.strip()]
+
+
+def get_sample_period(series):
+    """Find the sample period by finding the stats.mode of the 
+    forward difference.  Only use the first 100 samples (for speed).
+    Returns an int
+    """
+    fwd_diff = np.diff(series.index.values[:100]).astype(np.float)
+    mode_fwd_diff = stats.mode(fwd_diff)[0][0]
+    return mode_fwd_diff / 1E9
 
 
 class Channel(object):
@@ -127,11 +138,7 @@ class Channel(object):
             self.save()
 
         if self.sample_period is None:
-            # Find the sample period by finding the stats.mode of the 
-            # forward difference.  Only use the first 100 samples (for speed).
-            fwd_diff = np.diff(self.series.index.values[:100]).astype(np.float)
-            mode_fwd_diff = int(round(stats.mode(fwd_diff)[0][0]))
-            self.sample_period = mode_fwd_diff / 1E9
+            self.sample_period = get_sample_period(self.series)
 
     def save(self, data_dir=None):
         """Saves self.series to data_dir/channel_<chan>.h5
@@ -188,20 +195,24 @@ class Channel(object):
         s += "     mode power = {:>7.1f}W\n".format(stats.mode(self.series)[0][0])
         return s        
 
-    def usage_per_day(self, tz_convert=None, verbose=False):
+    def usage_per_period(self, freq, tz_convert=None, verbose=False):
         """
         Args:
-            tz_convert (str): (optional) Use 'midnight' in this timezone.
+            freq (str): see indicies_of_periods() for acceptable values.
+
+            tz_convert (str): (optional) e.g. 'UTC' or 'Europe/London'
 
         Object member variables which you may want to modify before calling
         this function:
+
             on_power_threshold (float or int): Threshold which defines the
                 distinction between "on" and "off".  Watts.
+
             acceptable_dropout_rate (float). Must be >= 0 and <= 1.  Remove any
                 row which has a worse dropout rate.
 
         Returns:
-            pd.DataFrame.  One row per day.  data is (np.float)
+            pd.DataFrame.  One row per period.  Index is PeriodIndex (UTC).
                 Series:
                      hours_on
                      kwh
@@ -212,40 +223,40 @@ class Channel(object):
         series = (self.series if tz_convert is None else
                   self.series.tz_convert(tz_convert))
 
-        # Construct the date_index for the output.  Each item is a Datetime
+        # Construct the period_index for the output.  Each item is a Datetime
         # at midnight.
-        date_index, day_boundaries = self.days(series)
-        hours_on = pd.Series(index=date_index, dtype=np.float, 
+        period_index, period_boundaries = indicies_of_periods(series.index, freq)
+        hours_on = pd.Series(index=period_index, dtype=np.float, 
                              name=self.name+' hours on')
-        kwh = pd.Series(index=date_index, dtype=np.float, 
+        kwh = pd.Series(index=period_index, dtype=np.float, 
                         name=self.name+' kWh')
 
-        MAX_SAMPLES_PER_DAY = SECS_PER_DAY / self.sample_period
-        MIN_SAMPLES_PER_DAY = MAX_SAMPLES_PER_DAY * (1-self.acceptable_dropout_rate)
+        MAX_SAMPLES_PER_PERIOD = SECS_PER_FREQ[freq] / self.sample_period
+        MIN_SAMPLES_PER_PERIOD = (MAX_SAMPLES_PER_PERIOD * 
+                                  (1-self.acceptable_dropout_rate))
 
-        for day_i in range(date_index.size-1):
-            day_start_index, day_end_index = day_boundaries[day_i]
-            day = date_index[day_i]
-            if day_start_index is None:
+        for period in period_index[:-1]:
+            period_start_i, period_end_i = period_boundaries[period]
+            if period_start_i is None:
                 if verbose:
-                    print("No data available for   ", day.strftime('%Y-%m-%d'))
+                    print("No data available for   ", period.strftime('%Y-%m-%d'))
                 continue
-            data_for_day = series[day_start_index:day_end_index]
-            if data_for_day.size < MIN_SAMPLES_PER_DAY:
+            data_for_period = series[period_start_i:period_end_i]
+            if data_for_period.size < MIN_SAMPLES_PER_PERIOD:
                 if verbose:
-                    print("Insufficient samples for", day.strftime('%Y-%m-%d'),
-                          "; samples =", data_for_day.size,
-                          "dropout_rate = {:.2%}".format(1 - (data_for_day.size / 
-                                                              MAX_SAMPLES_PER_DAY)))
-                    print("                 start =", data_for_day.index[0])
-                    print("                   end =", data_for_day.index[-1])
+                    print("Insufficient samples for", period.strftime('%Y-%m-%d'),
+                          "; samples =", data_for_period.size,
+                          "dropout_rate = {:.2%}".format(1 - (data_for_period.size / 
+                                                              MAX_SAMPLES_PER_PERIOD)))
+                    print("                 start =", data_for_period.index[0])
+                    print("                   end =", data_for_period.index[-1])
                 continue
             
-            hours_on[day] = self.hours_on(data_for_day)
-            kwh[day] = self.kwh(data_for_day)
+            hours_on[period] = self.hours_on(data_for_period)
+            kwh[period] = self.kwh(data_for_period)
 
-        return pd.DataFrame({'hours_on': hours_on.dropna(),
-                             'kwh': kwh.dropna()})
+        return pd.DataFrame({'hours_on': hours_on,
+                             'kwh': kwh})
 
     def hours_on(self, series=None):
         """Returns a float representing the number of hours this channel
@@ -279,50 +290,74 @@ class Channel(object):
         watt_seconds = (td_limited * series.values[:-1]).sum()
         return watt_seconds / 3600000
 
-    def days(self, tz_converted_series=None):
-        """
-        Args:
-            tz_converted_series (pd.Series): optional.  Defaults to self.series
 
-        Returns: date_index, list_of_indicies
-            date_index (pd.tseries.index.DatetimeIndex): each row is a say
-            day_boundaries (list of 2-tuples of ints): 
-                [(start index for day date_index[0], end index),
-                 (start index for day date_index[1], end index), ...]
-                e.g.
-                [(0,100), (101, 200)]
-        """
-        series = (self.series if tz_converted_series is None 
-                  else tz_converted_series)
-        date_index = pd.date_range(series.index[0], series.index[-1],
-                                   freq='D', normalize=True)
+def indicies_of_periods(datetime_index, freq):
+    """
+    Args:
+        datetime_index (pd.tseries.index.DatetimeIndex)
 
-        MAX_SAMPLES_PER_DAY = SECS_PER_DAY / self.sample_period
-        MAX_SAMPLES_PER_2_DAYS = MAX_SAMPLES_PER_DAY * 2
+        freq (str): one of the following:
+            'A' for yearly
+            'M' for monthly
+            'D' for daily
+            'H' for hourly
+            'T' for minutely
 
-        n_rows_processed = 0
-        day_boundaries = []
-        for day_i in range(date_index.size-1):
-            # The simplest way to get data for just a single day is to use
-            # data_for_day = series[day.strftime('%Y-%m-%d')]
-            # but this takes about 300ms per call on my machine.
-            # So we take advantage of several features of the data to achieve
-            # a 300x speedup:
-            # 1. We use the fact that the data is sorted in order, hence 
-            #    we can chomp through it in order.
-            # 2. MAX_SAMPLES_PER_DAY sets an upper bound on the number of
-            #    datapoints per day.  The code is conservative and uses 
-            #    MAX_SAMPLES_PER_2_DAYS. We only search through a small subset
-            #    of the available data.
-            data_to_process = series.index[n_rows_processed: 
-                                           n_rows_processed+MAX_SAMPLES_PER_2_DAYS]
-            indicies_for_day = np.where(data_to_process < date_index[day_i+1])[0]
-            if indicies_for_day.size == 0:
-                day_boundaries.append((None, None))
-            else:
-                day_start_index = indicies_for_day[0] + n_rows_processed
-                day_end_index = indicies_for_day[-1] + n_rows_processed + 1
-                day_boundaries.append((day_start_index, day_end_index))
-                n_rows_processed += day_end_index - day_start_index
+    Returns: rng, period_boundaries
+        rng (pd.tseries.index.PeriodIndex)
 
-        return date_index, day_boundaries
+        period_boundaries (dict).  
+            keys = pd.Period (in the local time of datetime_index)
+            values = 2-tuples of ints: (start index, end index for period)
+    """
+    try:
+        TZ = datetime_index[0].tz.zone
+    except AttributeError:
+        TZ = None
+
+    # Find the minimum sample period.
+    # Only use the first 100 samples (for speed).
+    fwd_diff = np.diff(datetime_index.values[:100]).astype(np.float)
+    min_fwd_diff = fwd_diff.min()
+    min_sample_period = min_fwd_diff / 1E9
+
+    # Normalise the start datetime
+    rng = pd.period_range(datetime_index[0], datetime_index[-1], freq=freq)
+
+    MAX_SAMPLES_PER_PERIOD = SECS_PER_FREQ[freq] / min_sample_period
+    MAX_SAMPLES_PER_2_PERIODS = MAX_SAMPLES_PER_PERIOD * 2
+
+    n_rows_processed = 0
+    period_boundaries = {}
+    for period in rng:
+        # The simplest way to get data for just a single period is to use
+        # data_for_day = datetime_index[period.strftime('%Y-%m-%d')]
+        # but this takes about 300ms per call on my machine.
+        # So we take advantage of several features of the data to achieve
+        # a 300x speedup:
+        # 1. We use the fact that the data is sorted in order, hence 
+        #    we can chomp through it in order.
+        # 2. MAX_SAMPLES_PER_PERIOD sets an upper bound on the number of
+        #    datapoints per period.  The code is conservative and uses 
+        #    MAX_SAMPLES_PER_2_PERIODS. We only search through a small subset
+        #    of the available data.
+        data_to_process = datetime_index[n_rows_processed: 
+                                     n_rows_processed+MAX_SAMPLES_PER_2_PERIODS]
+        end_time = period.end_time
+        # Convert to correct timezone.  Can't use end_time.tz_convert(TZ)
+        # because this chucks out loads of warnings:
+        # "Warning: discarding nonzero nanoseconds".  
+        # To silence these warnings we re-create the
+        # tz_localize function (see pandas/tslib.pyx) to allow us to pass
+        # warn=False to to_pydatetime().
+        end_time = pd.Timestamp(end_time.to_pydatetime(warn=False), tz=TZ)
+        indicies_for_day = np.where(data_to_process < end_time)[0]
+        if indicies_for_day.size == 0:
+            period_boundaries[period] = (None, None)
+        else:
+            day_start_index = indicies_for_day[0] + n_rows_processed
+            day_end_index = indicies_for_day[-1] + n_rows_processed + 1
+            period_boundaries[period] = (day_start_index, day_end_index)
+            n_rows_processed += day_end_index - day_start_index
+
+    return rng, period_boundaries
