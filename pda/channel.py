@@ -398,7 +398,8 @@ class Channel(object):
         binned_data = self.series.resample(bin_size, how='max').to_period()
         binned_data = binned_data > self.on_power_threshold
 
-        timespans, boundaries = indicies_of_periods(binned_data.index, timespan)
+        timespans, boundaries = indicies_of_periods(binned_data.index.to_timestamp(),
+                                                    timespan)
 
         first_timespan = timespans[0]
         bins = pd.period_range(first_timespan.start_time, 
@@ -412,7 +413,7 @@ class Channel(object):
         for span in timespans:
             try:
                 start_index, end_index = boundaries[span]
-                data_for_timespan = binned_data[start_index+1:end_index+1]
+                data_for_timespan = binned_data[start_index:end_index]
             except IndexError:
                 print("No data for", span)
                 continue
@@ -421,5 +422,5 @@ class Channel(object):
             data_shifted = data_for_timespan.shift(bins_since_first_timespan, 
                                                    bin_size)
             distribution = distribution.add(data_shifted, fill_value = 0)
-            
+
         return distribution
