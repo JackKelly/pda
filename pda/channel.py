@@ -13,6 +13,7 @@ REQUIREMENTS:
 
 SECS_PER_HOUR = 3600
 SECS_PER_DAY = 86400
+MINS_PER_DAY = 1440
 DEFAULT_TIMEZONE = 'Europe/London'
 ACCEPTABLE_DROPOUT_RATE_IF_SOMETIMES_UNPLUGGED = 0.9
 ACCEPTABLE_DROPOUT_RATE_IF_NOT_UNPLUGGED = 0.2
@@ -21,8 +22,11 @@ ACCEPTABLE_DROPOUT_RATE_IF_NOT_UNPLUGGED = 0.2
 # data_dir contains a "custom_on_power_thresholds.dat" file
 DEFAULT_ON_POWER_THRESHOLD = 3
 
-# Seconds for each period length.
-SECS_PER_FREQ = {'T':60, 'H': 3600, 'D': 86400, 'M': 2678400, 'A': 31536000}
+
+def secs_per_period_alias(alias):
+    """Seconds for each period length."""
+    period = pd.Period('00:00', alias)
+    return (period.end_time - period.start_time).total_seconds()
 
 
 def load_labels(data_dir):
@@ -107,7 +111,7 @@ def indicies_of_periods(datetime_index, freq):
     # For the sake of speed, only use the first 100 samples.
     FWD_DIFF = np.diff(datetime_index.values[:100]).astype(np.float)
     MIN_SAMPLE_PERIOD = FWD_DIFF.min() / 1E9
-    MAX_SAMPLES_PER_PERIOD = SECS_PER_FREQ[freq] / MIN_SAMPLE_PERIOD
+    MAX_SAMPLES_PER_PERIOD = secs_per_period_alias(freq) / MIN_SAMPLE_PERIOD
     MAX_SAMPLES_PER_2_PERIODS = MAX_SAMPLES_PER_PERIOD * 2
     n_rows_processed = 0
     period_boundaries = {}
@@ -305,7 +309,7 @@ class Channel(object):
         kwh = pd.Series(index=period_range, dtype=np.float, 
                         name=self.name+' kWh')
 
-        MAX_SAMPLES_PER_PERIOD = SECS_PER_FREQ[freq] / self.sample_period
+        MAX_SAMPLES_PER_PERIOD = secs_per_period_alias(freq) / self.sample_period
         MIN_SAMPLES_PER_PERIOD = (MAX_SAMPLES_PER_PERIOD *
                                   (1-self.acceptable_dropout_rate))
 
@@ -369,3 +373,53 @@ class Channel(object):
         watt_seconds = (td_limited * series.values[:-1]).sum()
         return watt_seconds / 3600000
 
+    def activity_distribution(self, bin_size='T', timespan='D'):
+        """Returns a distribution describing when this appliance was turned
+        on over repeating timespans.  For example, if you want to see
+        which times of day this appliance was used then use 
+        bin_size='T' (minutely) or bin_size='H' (hourly) and
+        timespan='D' (daily).
+
+        Args:
+            bin_size (str): offset alias
+            timespan (str): offset alias
+
+        For valid offset aliases, see:
+        http://pandas.pydata.org/pandas-docs/dev/timeseries.html#offset-aliases
+
+        Returns:
+            pd.Series. One row for each bin in a timespan.
+            The values count the number of times this appliance has been on at
+            that particular time of the timespan.
+            Times are handled in local time.
+        """
+        
+        # Create a pd.Series with PeriodIndex with period length of 1 minute.
+        binned_data = self.series.resample(bin_size, how='max').to_period()
+        binned_data = binned_data > self.on_power_threshold
+
+        timespans, boundaries = indicies_of_periods(binned_data.index, timespan)
+
+        first_timespan = timespans[0]
+        bins = pd.period_range(first_timespan.start_time, 
+                               first_timespan.end_time,
+                               freq=bin_size)
+        distribution = pd.Series(0, index=bins)
+        
+        bins_per_timespan = int(round(secs_per_period_alias(timespan) /
+                                      secs_per_period_alias(bin_size)))
+
+        for span in timespans:
+            try:
+                start_index, end_index = boundaries[span]
+                data_for_timespan = binned_data[start_index+1:end_index+1]
+            except IndexError:
+                print("No data for", span)
+                continue
+
+            bins_since_first_timespan = (first_timespan - span) * bins_per_timespan
+            data_shifted = data_for_timespan.shift(bins_since_first_timespan, 
+                                                   bin_size)
+            distribution = distribution.add(data_shifted, fill_value = 0)
+            
+        return distribution

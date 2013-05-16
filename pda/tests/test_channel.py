@@ -1,11 +1,7 @@
 #!/usr/bin/python
 from __future__ import print_function, division
 import unittest, os, inspect
-from pda.channel import Channel, load_labels, SECS_PER_HOUR
-from pda.channel import load_sometimes_unplugged
-from pda.channel import ACCEPTABLE_DROPOUT_RATE_IF_NOT_UNPLUGGED
-from pda.channel import ACCEPTABLE_DROPOUT_RATE_IF_SOMETIMES_UNPLUGGED
-from pda.channel import DEFAULT_ON_POWER_THRESHOLD
+from pda.channel import *
 import pandas as pd
 import correct_answers
 
@@ -79,6 +75,12 @@ class TestChannel(unittest.TestCase):
         self.assertEqual(c.on_power_threshold, DEFAULT_ON_POWER_THRESHOLD)
         self.assertEqual(c.acceptable_dropout_rate, 
                          ACCEPTABLE_DROPOUT_RATE_IF_SOMETIMES_UNPLUGGED)
+
+    def test_secs_per_period_alias(self):
+        SECS_PER_FREQ = {'T':60, 'H': 3600, 'D': 86400, 'M': 2678400, 
+                         'A': 31536000}
+        for alias, secs in SECS_PER_FREQ.iteritems():
+            self.assertEqual(secs_per_period_alias(alias), secs)
 
 if __name__ == '__main__':
     unittest.main()
