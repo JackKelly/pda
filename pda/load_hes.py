@@ -2,32 +2,18 @@ from __future__ import print_function, division
 import pandas as pd
 import tables as tb
 import datetime
-import time
-
-# Notes:
-# Inverval IDs:
-# 1 = 1month, 2 mins
-# 2 = 1 year, 2 mins
-# 3 = 1 year, 10 mins (IGNORE THIS???)
 
 # houses = load list of house IDs
 # appliances_in_house = dict mapping house ID to list of appliance IDs
 
 DATETIME_FMT = '%Y-%m-%d %H:%M:%S'
 
-start_time = time.time()
-
 def str_to_datetime(date_str, time_str):
     datetime_str = date_str + ' ' + time_str
     return datetime.datetime.strptime(datetime_str, DATETIME_FMT)
 
-f = open('/data/HES/CSV data/appliance_group_data.csv', 'r')
-# f = open('/data/HES/CSV data/test.csv', 'r')
-
-houses = [202116]
-
-for house in houses:
-    # TODO: f.seek_to_beginning()
+def load_house(filename, house):
+    f = open(filename, 'r')
     line = f.readline() # ignore header in file
     line = f.readline().strip()
     dict_of_series = {}
@@ -76,10 +62,18 @@ for house in houses:
         data_list.append(watts)
         index_list.append(str_to_datetime(date_str, time_str))
 
+    f.close()
+
     if data_list:
         save_data(data_list, index_list)
     df = pd.DataFrame.from_dict(dict_of_series)
-    print(df)
-        
-end_time = time.time()
-print("Total seconds =", end_time-start_time)
+    return df
+
+# '/data/HES/CSV data/appliance_group_data.csv' 
+def load_dataset(filename='/data/HES/CSV data/test.csv'):
+    houses = [202116]
+
+    for house in houses:
+        df = load_house(filename, house)
+
+    return df
