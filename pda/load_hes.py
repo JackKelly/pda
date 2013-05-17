@@ -22,22 +22,24 @@ def str_to_datetime(date_str, time_str):
     return datetime.datetime.strptime(datetime_str, DATETIME_FMT)
 
 f = open('/data/HES/CSV data/appliance_group_data.csv', 'r')
+# f = open('/data/HES/CSV data/test.csv', 'r')
 
 houses = [202116]
 
 for house in houses:
     # TODO: f.seek_to_beginning()
-    line = f.readline()
+    line = f.readline() # ignore header in file
+    line = f.readline().strip()
     dict_of_series = {}
     data_list = []
     index_list = []
     prev_appliance = 9999
-    i = 0
     
     def save_data(dl, il):
-#        import ipdb; ipdb.set_trace()
         # Save data
         rng = pd.DatetimeIndex(il, freq='2T')
+        # would have liked to use PeriodIndex but can't seem
+        # to use PeriodIndex with 2-minute freq.
         series = pd.Series(dl, index=rng)
         try:
             dict_of_series[prev_appliance].append(series)
@@ -45,9 +47,10 @@ for house in houses:
             dict_of_series[prev_appliance] = series
         
 
-    while line and i < 5000000:
-#        i += 1
-        line = f.readline()
+    while True:
+        line = f.readline().strip()
+        if not line:
+            break
         split_line = line.split(',')
 
         interval_id = split_line[0]
@@ -68,7 +71,7 @@ for house in houses:
 
         date_str = split_line[3]
         watts = int(split_line[4])
-        time_str = split_line[5].strip()
+        time_str = split_line[5]
 
         data_list.append(watts)
         index_list.append(str_to_datetime(date_str, time_str))
