@@ -5,11 +5,12 @@ import numpy as np
 """
 The raw HES data is stored as 0.1 watt hours for the power data and
 0.1 degrees C for the temperature data.  "Appliances" 251-255 (inclusive)
-are temperature measurements.
+are temperature measurements.  Also converts to correct timezone.
 """
 
 src_store = pd.HDFStore('/data/HES/h5/HES.h5', 'r')
-dst_store = pd.HDFStore('/data/HES/h5/HESfloat.h5', 'w', complevel=9, complib='blosc')
+dst_store = pd.HDFStore('/data/HES/h5/HESfloat.h5', 'w', 
+                        complevel=9, complib='blosc')
 
 LAST_PWR_COLUMN = 250
 NANOSECONDS_PER_TENTH_OF_AN_HOUR = 1E9 * 60 * 6
@@ -18,6 +19,9 @@ for house_id in src_store.keys():
     house_id = house_id[1:]
     print(house_id)
     df = src_store[house_id]
+
+    df = df.tz_localize('UTC').tz_convert('Europe/London')
+
     tenth_hours_delta = (np.diff(df.index.values).astype(int) /
                          NANOSECONDS_PER_TENTH_OF_AN_HOUR)
 

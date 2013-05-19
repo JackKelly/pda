@@ -92,6 +92,7 @@ def load_house(filename, house):
         dict_of_series[appliance] = series
 
     df = pd.DataFrame.from_dict(dict_of_series)
+    df = df.tz_localize('UTC').tz_convert('Europe/London')
     return df
 
 
