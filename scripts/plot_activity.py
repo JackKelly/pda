@@ -7,15 +7,10 @@ import numpy as np
 from matplotlib.ticker import MultipleLocator
 import pandas as pd
 
-# TODO:
-# * Save dataframe (maybe create dataset class)
-# * PWR_ON_THRESHOLD per channel
-#
-# * Maybe create a new script for the following:
-# * Current plot is pretty hard to interpret.  Instead:
-#   - Y axis just represents channels.  Just a single 24hr period.
-#   - use several pixels per channel to make them nice and fat.
-#   - heatmap.  Increment pixel whenever a channel is on for that period.
+"""
+Plots a large bitmap showing activity for all channels over entire duration
+of dataset.
+"""
 
 PWR_ON_THRESHOLD = 4 # watts
 MIN_DAYS_PER_CHAN = 10

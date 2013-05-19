@@ -23,10 +23,7 @@ def format_time(x, pos=None):
         hours = x
     return '{:d}'.format(int(hours))
 
-if START_DATE:
-    c.series = c.series[c.series.index >= START_DATE]
-if END_DATE:
-    c.series = c.series[c.series.index <= END_DATE]
+c = c.crop(START_DATE, END_DATE)
 
 distribution = c.activity_distribution(bin_size=BIN_SIZE, timespan=TIMESPAN)
 

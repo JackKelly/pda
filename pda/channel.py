@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import scipy.stats as stats
 import pda.load_pwr_data as load_pwr_data
-import os
+import os, copy
 
 """
 REQUIREMENTS:
@@ -181,7 +181,7 @@ class Channel(object):
         self.sample_period = sample_period
         self.max_sample_period = max_sample_period
         self.name = name
-        self.series = series
+        self.series = series.dropna()
         self.acceptable_dropout_rate = acceptable_dropout_rate
         self.on_power_threshold = on_power_threshold
 
@@ -282,7 +282,20 @@ class Channel(object):
         s += "      max power = {:>7.1f}W\n".format(self.series.max())
         s += "      min power = {:>7.1f}W\n".format(self.series.min())
         s += "     mode power = {:>7.1f}W\n".format(stats.mode(self.series)[0][0])
-        return s        
+        return s
+
+    def crop(self, start_date=None, end_date=None):
+        """Does not modify self.  Instead returns a cropped channel.
+        """
+
+        cropped_chan = copy.copy(self)
+        if start_date:
+            cropped_chan.series = cropped_chan.series[cropped_chan.series.index 
+                                                      >= start_date]
+        if end_date:
+            cropped_chan.series = cropped_chan.series[cropped_chan.series.index
+                                                      <= end_date]
+        return cropped_chan
 
     def usage_per_period(self, freq, tz_convert=None, verbose=False):
         """
