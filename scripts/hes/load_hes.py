@@ -69,15 +69,15 @@ def load_house(filename, house):
 
         appliance = int(split_line[2])
         date_str = split_line[3]
-        watts = int(split_line[4])
+        watt_hrs = int(split_line[4])
         time_str = split_line[5]
 
         dt = str_to_datetime(date_str, time_str)
         try:
             appliance_data[appliance][0].append(dt)
-            appliance_data[appliance][1].append(watts)
+            appliance_data[appliance][1].append(watt_hrs)
         except KeyError:
-            appliance_data[appliance] = ([dt], [watts])
+            appliance_data[appliance] = ([dt], [watt_hrs])
 
     f.close()
 

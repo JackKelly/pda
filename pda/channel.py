@@ -171,19 +171,29 @@ class Channel(object):
                  timezone=DEFAULT_TIMEZONE, # str
                  sample_period=None, # seconds
                  max_sample_period=20, # seconds
+                 series=None, # pd.Series
+                 name="", # str
+                 acceptable_dropout_rate = ACCEPTABLE_DROPOUT_RATE_IF_NOT_UNPLUGGED,
+                 on_power_threshold = DEFAULT_ON_POWER_THRESHOLD
                  ):
         self.data_dir = data_dir
         self.chan = chan
         self.sample_period = sample_period
         self.max_sample_period = max_sample_period
+        self.name = name
+        self.series = series
+        self.acceptable_dropout_rate = acceptable_dropout_rate
+        self.on_power_threshold = on_power_threshold
 
-        self.name = ""
-        self.series = None
-        self.acceptable_dropout_rate = ACCEPTABLE_DROPOUT_RATE_IF_NOT_UNPLUGGED
-        self.on_power_threshold = DEFAULT_ON_POWER_THRESHOLD
-
+        # Load REDD / Jack's data
         if data_dir is not None and chan is not None:
             self.load(data_dir, chan, timezone)
+
+        self.update_sample_period()
+
+    def update_sample_period(self):
+        if self.sample_period is None:
+            self.sample_period = get_sample_period(self.series)
 
     def get_filename(self, data_dir=None, suffix='dat'):
         data_dir = data_dir if data_dir else self.data_dir
@@ -217,8 +227,7 @@ class Channel(object):
             self.series = self.series.sort_index() # MIT REDD data isn't always in order
             self.save()
 
-        if self.sample_period is None:
-            self.sample_period = get_sample_period(self.series)
+        self.update_sample_period()
 
     def save(self, data_dir=None):
         """Saves self.series to data_dir/channel_<chan>.h5

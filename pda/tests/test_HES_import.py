@@ -59,14 +59,14 @@ class TestHESImport(unittest.TestCase):
             dt_str = date_str + ' ' + time_str
             dt = datetime.datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S')
 
-            watts = split_line[4]
+            watt_hrs = split_line[4]
 
             try:
-                self.assertEqual(series[dt], int(watts))
-                self.assertEqual('{:.0f}'.format(series[dt_str]), watts)
+                self.assertEqual(series[dt], int(watt_hrs))
+                self.assertEqual('{:.0f}'.format(series[dt_str]), watt_hrs)
             except AssertionError as e:
                 print(e)
-                print(seek_point, household, appliance, dt, watts)
+                print(seek_point, household, appliance, dt, watt_hrs)
                 print(line)
                 print("")
 
