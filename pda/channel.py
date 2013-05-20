@@ -272,6 +272,7 @@ class Channel(object):
 
     def __str__(self):
         s = ""
+        s += "           name = {}\n".format(self.name)
         s += "     start date = {}\n".format(self.series.index[0])
         s += "       end date = {}\n".format(self.series.index[-1])
         s += "       duration = {}\n".format(self.series.index[-1] - 
