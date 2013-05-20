@@ -181,7 +181,7 @@ class Channel(object):
         self.sample_period = sample_period
         self.max_sample_period = max_sample_period
         self.name = name
-        self.series = series.dropna()
+        self.series = None if series is None else series.dropna()
         self.acceptable_dropout_rate = acceptable_dropout_rate
         self.on_power_threshold = on_power_threshold
 
@@ -189,10 +189,10 @@ class Channel(object):
         if data_dir is not None and chan is not None:
             self.load(data_dir, chan, timezone)
 
-        self.update_sample_period()
+        self._update_sample_period()
 
-    def update_sample_period(self):
-        if self.sample_period is None:
+    def _update_sample_period(self):
+        if self.sample_period is None and self.series is not None:
             self.sample_period = get_sample_period(self.series)
 
     def get_filename(self, data_dir=None, suffix='dat'):
@@ -227,7 +227,7 @@ class Channel(object):
             self.series = self.series.sort_index() # MIT REDD data isn't always in order
             self.save()
 
-        self.update_sample_period()
+        self._update_sample_period()
 
     def save(self, data_dir=None):
         """Saves self.series to data_dir/channel_<chan>.h5
@@ -446,3 +446,23 @@ class Channel(object):
             distribution = distribution.add(data_shifted, fill_value = 0)
 
         return distribution
+
+    def on(self):
+        """Returns pd.Series with Boolean values indicating whether the
+        appliance is on (True) or off (False)."""
+        return self.series >= self.on_power_threshold
+
+    def on_off_events(self):
+        """Returns a pd.Series with np.int8 values.
+               1 == turn-on event.
+              -1 == turn-off event.
+        
+        Example (pseudo-code):
+            self.series = 0, 0, 100, 100, 100, 0
+            c.on_off_events()
+            2:  1
+            5: -1
+        """
+        on = self.on().astype(np.int8)
+        events = on[1:] - on.shift(1)[1:]
+        return events[events != 0]

@@ -82,5 +82,12 @@ class TestChannel(unittest.TestCase):
         for alias, secs in SECS_PER_FREQ.iteritems():
             self.assertEqual(secs_per_period_alias(alias), secs)
 
+    def test_on_off_events(self):
+        s = pd.Series([0, 0, 100, 100, 100, 0])
+        c = Channel(series=s)
+        events = c.on_off_events()
+        self.assertEqual(events[2], 1)
+        self.assertEqual(events[5], -1)
+
 if __name__ == '__main__':
     unittest.main()
