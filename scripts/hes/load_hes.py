@@ -117,6 +117,11 @@ def load_list_of_houses(filename='/data/HES/CSVdata/ipsos - public.csv'):
 # '/data/HES/CSVdata/test.csv'
 def load_dataset(filename='/data/HES/CSVdata/appliance_group_data.csv',
                  houses=['202116']):
+    """
+    Args:
+       filename (str)
+       houses (list of strings, e.g. ['202116', '203493']): houses to load
+    """
 
     store = pd.HDFStore('HES_10min.h5', 'a', complevel=9, complib='blosc')
     
@@ -133,5 +138,3 @@ def load_dataset(filename='/data/HES/CSVdata/appliance_group_data.csv',
             store.flush()
     finally:
         store.close()
-
-# 201103 is trouble "index not valid datetimeindex or periodindex"
