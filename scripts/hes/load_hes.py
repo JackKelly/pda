@@ -40,6 +40,12 @@ def str_to_datetime(date_str, time_str):
     return np.datetime64(py_datetime)
 
 def load_house(filename, house):
+    """
+    Returns:
+       pd.DataFrame if there is data
+       None if there is no data for this house
+    """
+
     # Columns (comma separated):
     # 0: IntervalID   e.g. '1'
     # 1: Household    e.g. '202166'
@@ -64,12 +70,12 @@ def load_house(filename, house):
             continue
 
         interval_id = split_line[0]
-        if interval_id == '3':
+        if interval_id != '3':
             continue  # ignore "1 year, 10 mins" data
 
-        appliance = int(split_line[2])
+        appliance = float(split_line[2])
         date_str = split_line[3]
-        watt_hrs = int(split_line[4])
+        watt_hrs = float(split_line[4])
         time_str = split_line[5]
 
         dt = str_to_datetime(date_str, time_str)
@@ -81,12 +87,15 @@ def load_house(filename, house):
 
     f.close()
 
+    if not appliance_data:
+        return
+
     dict_of_series = {}
     for appliance, data in appliance_data.iteritems():
-        rng = pd.DatetimeIndex(data[0], freq='2T')
+        rng = pd.DatetimeIndex(data[0], freq='10T')
         # would have liked to use PeriodIndex but can't seem
         # to use PeriodIndex with 2-minute freq.
-        series = pd.Series(data[1], index=rng, dtype=np.int16)
+        series = pd.Series(data[1], index=rng, dtype=float)
         # Don't use unsigned ints because "appliances" 251-255
         # record temperature values and sometimes go negative.
         dict_of_series[appliance] = series
@@ -96,7 +105,7 @@ def load_house(filename, house):
     return df
 
 
-def load_list_of_houses(filename='/data/HES/CSV data/ipsos - public.csv'):
+def load_list_of_houses(filename='/data/HES/CSVdata/ipsos - public.csv'):
     """Returns a list of strings."""
     f = open(filename, 'r')
     lines = f.readlines()[1:]
@@ -105,17 +114,18 @@ def load_list_of_houses(filename='/data/HES/CSV data/ipsos - public.csv'):
     return houses
 
 
-# '/data/HES/CSV data/appliance_group_data.csv'
-def load_dataset(filename='/data/HES/CSV data/test.csv', houses=['202116']):
+# '/data/HES/CSVdata/test.csv'
+def load_dataset(filename='/data/HES/CSVdata/appliance_group_data.csv',
+                 houses=['202116']):
 
-    store = pd.HDFStore('HES.h5', 'w', complevel=9, complib='blosc')
+    store = pd.HDFStore('HES_10min.h5', 'a', complevel=9, complib='blosc')
     
     try:
         for house in houses:
             print('Loading house ', house, '... ', sep='', end='')
             sys.stdout.flush()
             df = load_house(filename, house)
-            if df.empty:
+            if df is None or df.empty:
                 print('empty.')
             else:
                 print(len(df), 'rows read. Done.')
@@ -123,3 +133,5 @@ def load_dataset(filename='/data/HES/CSV data/test.csv', houses=['202116']):
             store.flush()
     finally:
         store.close()
+
+# 201103 is trouble "index not valid datetimeindex or periodindex"
