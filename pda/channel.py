@@ -454,7 +454,17 @@ class Channel(object):
     def on(self):
         """Returns pd.Series with Boolean values indicating whether the
         appliance is on (True) or off (False)."""
-        return self.series >= self.on_power_threshold
+        when_on = self.series >= self.on_power_threshold
+        # add an 'off' entry whenever data is lost for > self.max_sample_period
+        time_delta = np.diff(self.series.index.values)
+        max_sample_period = np.timedelta64(self.max_sample_period, 's')
+        dropout_dates = self.series.index[1:][time_delta > max_sample_period]
+        insert_offs = pd.Series(False, 
+                                index=dropout_dates +
+                                      pd.DateOffset(seconds=self.max_sample_period))
+        when_on = when_on.append(insert_offs)
+        when_on = when_on.sort_index()
+        return when_on
 
     def on_off_events(self):
         """Returns a pd.Series with np.int8 values.
