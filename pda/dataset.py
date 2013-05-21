@@ -35,9 +35,15 @@ def load_dataset(data_dir):
     return channels
 
 
-def cluster_appliances(dataset):
-    """Args:
-           dataset (list of pda.channel.Channels)
+def cluster_appliances_period(dataset, period):
+    """
+    Args:
+       dataset (list of pda.channel.Channels)
+       period (pd.Period)
+
+    Returns:
+       list of sets of ints.  Each set stores the channel.chan (int)
+           of each channel in that set.
     
     Relevant docs:
     http://scikit-learn.org/stable/auto_examples/cluster/plot_dbscan.html
@@ -45,12 +51,13 @@ def cluster_appliances(dataset):
 
     merged_events = pd.Series()
     for c in dataset:
-        c = c.crop('2013-05-01', '2013-05-02')
-        events = c.on_off_events()
-        events = events[events == 1]
+        cropped_c = c.crop(period.start_time, period.end_time)
+        events = cropped_c.on_off_events()
+        events = events[events == 1] # select turn-on events
+        events[:] = c.chan # so we can decipher which chan IDs are in each cluster
         merged_events = merged_events.append(events)
 
-    merged_events.sort_index()
+    merged_events = merged_events.sort_index()
 
     # distance.pdist() requires a 2D array so convert
     # datetimeIndex to a 2D array
@@ -64,7 +71,7 @@ def cluster_appliances(dataset):
     # Run cluster algorithm
     # eps is the maximum distance between samples.  In our case,
     # it is in units of seconds.
-    db = DBSCAN(eps=60*60, min_samples=2, metric="precomputed").fit(D)
+    db = DBSCAN(eps=60*10, min_samples=2, metric="precomputed").fit(D)
     core_samples = db.core_sample_indices_
     labels = db.labels_
 
@@ -80,6 +87,7 @@ def cluster_appliances(dataset):
     ax = fig.add_subplot(111)
 
     colors = cycle('bgrcmybgrcmybgrcmybgrcmy')
+    chans_in_each_cluster = []
     for k, col in zip(set(labels), colors):
         if k == -1:
             # Black used for noise.
@@ -88,15 +96,22 @@ def cluster_appliances(dataset):
         class_members = [index[0] for index in np.argwhere(labels == k)]
         cluster_core_samples = [index for index in core_samples
                                 if labels[index] == k]
+
+        if k != -1:
+            chans_in_each_cluster.append(set(merged_events.ix[class_members]))
+
         for index in class_members:
             plot_x = merged_events.index[index]
             if index in core_samples and k != -1:
                 markersize = 14
             else:
                 markersize = 6
-            ax.plot(plot_x, 1, 'o', markerfacecolor=col,
+
+            ax.plot(plot_x, merged_events.ix[index], 'o', markerfacecolor=col,
                     markeredgecolor='k', markersize=markersize)
 
-    plt.show()
 
-#    import ipdb; ipdb.set_trace()
+    plt.show()
+    ylim = ax.get_ylim()
+    ax.set_ylim( [ylim[0]-1, ylim[1]+1] )
+    return chans_in_each_cluster
