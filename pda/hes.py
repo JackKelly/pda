@@ -1,3 +1,10 @@
+"""
+Functions for processing DEFRA's Home Energy Survey dataset (once
+loaded into an HDF5 file).
+
+More info on DEFRA's Household Electricity Survey:
+http://randd.defra.gov.uk/Default.aspx?Menu=Menu&Module=More&Location=None&Completed=0&ProjectID=17359
+"""
 
 def load_appliance_labels(filename='/data/HES/CSVdata/appliance_list.csv'):
     f = open(filename, 'r')

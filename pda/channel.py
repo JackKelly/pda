@@ -6,6 +6,9 @@ import pda.load_pwr_data as load_pwr_data
 import os, copy
 
 """
+Contains the Channel class (for representing a single channel or appliance)
+along with some helper functions.
+
 REQUIREMENTS:
   pandas >= 0.11.0
   pytables (sudo apt-get install python-tables)

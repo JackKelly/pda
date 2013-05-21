@@ -2,6 +2,10 @@ from __future__ import print_function, division
 import pandas as pd
 import numpy as np
 
+"""
+Functions for loading data from the UK metoffice.
+"""
+
 def open_daily_xls(filename, sheet='HEATHROW'):
     """Opens an XLS file from the UK met office.
 

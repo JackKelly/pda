@@ -9,6 +9,13 @@ from sklearn import metrics
 import matplotlib.pyplot as plt
 from itertools import cycle
 
+"""
+Functions for loading an entire data directory into a list of
+Channels and then manipulating those datasets.
+
+I'm using the term "dataset" to mean a list of Channels.
+"""
+
 def load_dataset(data_dir):
     """Loads an entire dataset directory.
 
