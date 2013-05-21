@@ -6,10 +6,10 @@ import numpy as np
 DATASET_DIR = '/data/mine/vadeec/jack-merged'
 TOP_N = 20 # how many clusters to display?
 
-# dataset = ds.load_dataset(DATASET_DIR)
+dataset = ds.load_dataset(DATASET_DIR)
 
-# period_range = pd.period_range(dataset[0].series.index[0], 
-#                               dataset[0].series.index[-1], freq='D')
+period_range = pd.period_range(dataset[0].series.index[0], 
+                              dataset[0].series.index[-1], freq='D')
 
 freqs = ds.cluster_appliances(dataset, 
                               ignore_chans=[1, 2, 3, 5, 12, 16, 18, 25, 32, 38, 43],
@@ -50,8 +50,22 @@ ax.set_yticks([])
 # ax.set_yticks(pos)
 # ax.set_yticklabels(plot_labels)
 ax.set_ylim([0.5, TOP_N+1.5])
-xlim = ax.get_xlim()
-ax.set_xticks(np.arange(xlim[1]+1))
+# xlim = ax.get_xlim()
+# ax.set_xticks(np.arange(xlim[1]+1))
 ax.set_xlabel('Number of times set of appliances turn on within 10 minutes of each other')
 ax.set_title('Sets of appliances which turn on within 10 minutes of each other')
+fig.tight_layout()
 plt.show()
+
+"""
+TODO:
+
+New design:
+
+------------------------+-----------------------------\
+kitchen lights, kettle, : kitchen lights, microwave   |
+                        :--------------------------+--/
+toaster, microwave      : kitchen lights, toaster  |
+------------------------+--------------------------/
+
+"""
