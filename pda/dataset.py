@@ -16,7 +16,7 @@ Channels and then manipulating those datasets.
 I'm using the term "dataset" to mean a list of Channels.
 """
 
-def load_dataset(data_dir):
+def load_dataset(data_dir='/data/mine/vadeec/jack-merged'):
     """Loads an entire dataset directory.
 
     Args:
@@ -42,11 +42,12 @@ def load_dataset(data_dir):
     return channels
 
 
-def cluster_appliances_period(dataset, period):
+def cluster_appliances_period(dataset, period, ignore_chans=[], plot=False):
     """
     Args:
        dataset (list of pda.channel.Channels)
        period (pd.Period)
+       ignore_chans (list of ints)
 
     Returns:
        list of sets of ints.  Each set stores the channel.chan (int)
@@ -58,6 +59,8 @@ def cluster_appliances_period(dataset, period):
 
     merged_events = pd.Series()
     for c in dataset:
+        if c.chan in ignore_chans:
+            continue
         cropped_c = c.crop(period.start_time, period.end_time)
         events = cropped_c.on_off_events()
         events = events[events == 1] # select turn-on events
@@ -86,12 +89,10 @@ def cluster_appliances_period(dataset, period):
     n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
 
     print('Estimated number of clusters: {:d}'.format(n_clusters_))
-    print("Silhouette Coefficient: {:0.3f}".format(
-           metrics.silhouette_score(D, labels, metric='precomputed')))
 
-    # PLOT
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
+    if plot:
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
 
     colors = cycle('bgrcmybgrcmybgrcmybgrcmy')
     chans_in_each_cluster = []
@@ -107,18 +108,41 @@ def cluster_appliances_period(dataset, period):
         if k != -1:
             chans_in_each_cluster.append(set(merged_events.ix[class_members]))
 
-        for index in class_members:
-            plot_x = merged_events.index[index]
-            if index in core_samples and k != -1:
-                markersize = 14
-            else:
-                markersize = 6
+        if plot:
+            for index in class_members:
+                plot_x = merged_events.index[index]
+                if index in core_samples and k != -1:
+                    markersize = 14
+                else:
+                    markersize = 6
 
-            ax.plot(plot_x, merged_events.ix[index], 'o', markerfacecolor=col,
-                    markeredgecolor='k', markersize=markersize)
+                ax.plot(plot_x, merged_events.ix[index], 'o', markerfacecolor=col,
+                        markeredgecolor='k', markersize=markersize)
 
-
-    plt.show()
-    ylim = ax.get_ylim()
-    ax.set_ylim( [ylim[0]-1, ylim[1]+1] )
+    if plot:
+        plt.show()
+        ylim = ax.get_ylim()
+        ax.set_ylim( [ylim[0]-1, ylim[1]+1] )
+        ax.set_title(str(period))
+        ax.set_xlabel('time')
+        ax.set_ylabel('channel number')
     return chans_in_each_cluster
+
+def cluster_appliances(dataset, ignore_chans=[], period_range=None):
+    if period_range is None:
+        period_range = pd.period_range(dataset[0].series.index[0], 
+                                       dataset[0].series.index[-1], freq='D')
+    
+    chans_in_each_cluster = []
+    for period in period_range:
+        print(period)
+        chans_in_each_cluster.extend(cluster_appliances_period(dataset, period, ignore_chans))
+
+    freqs = []
+    # now find frequently occurring sets
+    for s in chans_in_each_cluster:
+        freqs.append((s, chans_in_each_cluster.count(s)))
+
+    # Sort by count; highest count first
+    freqs.sort(key=lambda x: x[1], reverse=True)
+    return freqs
