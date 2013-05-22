@@ -8,8 +8,8 @@ The raw HES data is stored as 0.1 watt hours for the power data and
 are temperature measurements.  Also converts to correct timezone.
 """
 
-src_store = pd.HDFStore('/data/HES/h5/HES.h5', 'r')
-dst_store = pd.HDFStore('/data/HES/h5/HESfloat.h5', 'w', 
+src_store = pd.HDFStore('/data/HES/h5/HES_10min.h5', 'r')
+dst_store = pd.HDFStore('/data/HES/h5/HES_10min_watts.h5', 'w', 
                         complevel=9, complib='blosc')
 
 LAST_PWR_COLUMN = 250
@@ -20,7 +20,7 @@ for house_id in src_store.keys():
     print(house_id)
     df = src_store[house_id]
 
-    df = df.tz_localize('UTC').tz_convert('Europe/London')
+#    df = df.tz_localize('UTC').tz_convert('Europe/London')
 
     tenth_hours_delta = (np.diff(df.index.values).astype(int) /
                          NANOSECONDS_PER_TENTH_OF_AN_HOUR)
