@@ -1,6 +1,6 @@
 from __future__ import print_function
-import pylab
-from pylab import sqrt
+import matplotlib
+from math import sqrt
 
 def setup(fig_width=None, fig_height=None, columns=1):
     """
@@ -29,13 +29,13 @@ def setup(fig_width=None, fig_height=None, columns=1):
         fig_height = MAX_HEIGHT_INCHES
 
     params = {'backend': 'ps',
-              'axes.labelsize': 10,
-              'text.fontsize': 10,
-              'legend.fontsize': 10,
+              'axes.labelsize': 8, # was 10
+              'text.fontsize': 8, # was 10
+              'legend.fontsize': 8, # was 10
               'xtick.labelsize': 8,
               'ytick.labelsize': 8,
               'text.usetex': True,
               'figure.figsize': [fig_width,fig_height]}
 
-    pylab.rcParams.update(params)
+    matplotlib.rcParams.update(params)
 
