@@ -99,6 +99,6 @@ for chan_id in CHAN_IDS:
 
     ax.xaxis.grid(color='gray')
 
-plt.subplots_adjust(hspace=0.3)
+plt.subplots_adjust(hspace=0.4)
 plt.show()
 plt.savefig(LATEX_PDF_OUTPUT_FILENAME)
