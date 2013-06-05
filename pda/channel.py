@@ -273,6 +273,18 @@ class Channel(object):
         n_expected_samples = duration.total_seconds() / self.sample_period
         return 1 - (self.series.size / n_expected_samples)
 
+    def get_long_name(self):
+        long_labels = {'tv': 'TV',
+                       'htpc': 'home theatre PC',
+                       'lcd office': 'office LCD screen',
+                       'livingroom s lamp': 'livingroom standing lamp',
+                       'childs ds lamp': 'reading lamp in child\'s room'}
+        short_label = self.name.replace('_', ' ')
+        try:
+            return long_labels[short_label]
+        except KeyError:
+            return short_label
+
     def __str__(self):
         s = ""
         s += "           name = {}\n".format(self.name)

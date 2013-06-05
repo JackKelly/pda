@@ -2,6 +2,8 @@ from __future__ import print_function
 import matplotlib
 from math import sqrt
 
+SPINE_COLOR = 'gray'
+
 def setup(fig_width=None, fig_height=None, columns=1):
     """
     Args:
@@ -29,7 +31,8 @@ def setup(fig_width=None, fig_height=None, columns=1):
         fig_height = MAX_HEIGHT_INCHES
 
     params = {'backend': 'ps',
-              'axes.labelsize': 8, # was 10
+              'axes.labelsize': 8, # fontsize for x and y labels (was 10)
+              'axes.titlesize': 8,
               'text.fontsize': 8, # was 10
               'legend.fontsize': 8, # was 10
               'xtick.labelsize': 8,
@@ -39,3 +42,19 @@ def setup(fig_width=None, fig_height=None, columns=1):
 
     matplotlib.rcParams.update(params)
 
+def format_axes(ax):
+
+    for spine in ['top', 'right']:
+        ax.spines[spine].set_visible(False)
+
+    for spine in ['left', 'bottom']:
+        ax.spines[spine].set_color(SPINE_COLOR)
+        ax.spines[spine].set_linewidth(0.5)
+
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+
+    for axis in [ax.xaxis, ax.yaxis]:
+        axis.set_tick_params(direction='out', color=SPINE_COLOR)
+
+    matplotlib.pyplot.tight_layout()
