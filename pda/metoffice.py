@@ -37,7 +37,7 @@ def open_daily_xls(filename, sheet='HEATHROW'):
     }
 
     descriptions = {
-        'radiation': 'daily total global radiation $KJ/m^{2}$',
+        'radiation': 'daily total global radiation $MJ/m^{2}$',
         'max_temp': 'daily maximum temperature $\degree C$',
         'min_temp': 'daily minimum temperature $\degree C$',
         'mean_temp': 'daily mean temperature from hourly data $\degree C$'
@@ -51,8 +51,18 @@ def open_daily_xls(filename, sheet='HEATHROW'):
     df['rainfall'][df['rainfall'] == 'tr'] = 0.04
     df['rainfall'] = df['rainfall'].astype(np.float)
 
+    df['radiation'] /= 1000
+
     for key, val in descriptions.iteritems():
         print("adding a 'description' field for", key)
         df[key].description = val
 
     return df
+
+def get_long_name(short_name):
+    long_names = {'radiation': 'solar radiation'}
+    short_name = short_name.replace('_', ' ')
+    try:
+        return long_names[short_name]
+    except KeyError:
+        return short_name

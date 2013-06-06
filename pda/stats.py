@@ -17,7 +17,7 @@ def align(x, y):
     y_aligned.name = yname
     return x_aligned, y_aligned
 
-def plot_regression_line(ax, x_aligned, y_aligned, slope, intercept, r_value, color='b'):
+def plot_regression_line(ax, x_aligned, y_aligned, slope, intercept, r_value, color='k'):
     ax.plot(x_aligned, y_aligned, color+'o', alpha=0.2)
     # plot linear regression line
     xlim = ax.get_xlim()
@@ -28,7 +28,7 @@ def plot_regression_line(ax, x_aligned, y_aligned, slope, intercept, r_value, co
                 .format(r_value**2, x_aligned.size),
                 ((xlim[1]-xlim[0])*0.8 + xlim[0],
                  (ylim[1]-ylim[0])*0.8),
-                color=color)
+                color=color, size=8)
     ax.set_ylim((0, ylim[1]))
 
     xlabel = x_aligned.__dict__.get('description')

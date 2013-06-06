@@ -6,23 +6,78 @@ import matplotlib.ticker as ticker
 from matplotlib.ticker import MultipleLocator
 import numpy as np
 import os
+import datetime
 import setupPlottingForLaTeX as spfl
-import math
 
-CHAN_IDS = [2,3,7,17,9,19,25,8,10,11,13,42,14,45,16]
-START_DATE = None # datetime.datetime(year=2013, month=3, day=1)
-END_DATE = None # datetime.datetime(year=2013, month=3, day=1)
-BIN_SIZE = 'T' # D (daily) or H (hourly) or T (minutely)
-TIMESPAN = 'D' # D (daily) or W (weekly)
-LATEX_PDF_OUTPUT_FILENAME = ('~/Dropbox/MyWork/imperial/PhD/writing/papers/'
-                             'tetc2013/figures/'
-                             'daily_usage_histograms.pdf') # string or None
 BAR_COLOR = 'k'
 SPINE_COLOR = 'grey'
 
-if LATEX_PDF_OUTPUT_FILENAME is not None:
-    LATEX_PDF_OUTPUT_FILENAME = os.path.expanduser(LATEX_PDF_OUTPUT_FILENAME)
+# FIGURE_PRESET options:
+#   'daily usage histogram'
+#   'weekly usage histogram'
+#   'boiler seasons'
+FIGURE_PRESET = 'weekly usage histogram'
+
+FIGURE_PATH = os.path.expanduser('~/Dropbox/MyWork/imperial/PhD/writing'
+                                 '/papers/tetc2013/figures/')
+
+if FIGURE_PRESET == 'daily usage histogram':
+    START_DATE = None # datetime.datetime(year=2013, month=3, day=1)
+    END_DATE = None # datetime.datetime(year=2013, month=3, day=1)
+    BIN_SIZE = 'T' # D (daily) or H (hourly) or T (minutely)
+    TIMESPAN = 'D' # D (daily) or W (weekly)
+    CHAN_IDS = [2,3,7,17,9,19,25,8,10,11,13,42,14,45,16]
     spfl.setup(fig_height=8)
+    GRID = True
+    TITLE_Y = 0.87
+    XTICKS_ON = False
+    LATEX_PDF_OUTPUT_FILENAME = os.path.join(FIGURE_PATH,
+                                             'daily_usage_histograms.pdf')
+elif FIGURE_PRESET == 'weekly usage histogram':
+    START_DATE = None # datetime.datetime(year=2013, month=3, day=1)
+    END_DATE = None # datetime.datetime(year=2013, month=3, day=1)
+    BIN_SIZE = 'D' # D (daily) or H (hourly) or T (minutely)
+    TIMESPAN = 'W' # D (daily) or W (weekly)
+    CHAN_IDS = [14,22]
+    spfl.setup()
+    GRID = False
+    TITLE_Y = 0.95
+    XTICKS_ON = True
+    LATEX_PDF_OUTPUT_FILENAME = os.path.join(FIGURE_PATH,
+                                             'weekly_usage_histograms.pdf')
+else:
+    CHAN_IDS = []
+
+CHANS = []
+for chan_id in CHAN_IDS:
+    # Get channel data
+    c = Channel('/data/mine/vadeec/jack-merged', chan_id)
+    c = c.crop(START_DATE, END_DATE)
+    CHANS.append(c)
+
+if FIGURE_PRESET == 'boiler seasons':
+    BIN_SIZE = 'T' # D (daily) or H (hourly) or T (minutely)
+    TIMESPAN = 'D' # D (daily) or W (weekly)
+    spfl.setup()
+    GRID = False
+    TITLE_Y = 0.95
+    XTICKS_ON = True
+    LATEX_PDF_OUTPUT_FILENAME = os.path.join(FIGURE_PATH,
+                                             'seasonal_variation.pdf')
+    winter_boiler = Channel('/data/mine/vadeec/jack-merged', 2)
+    winter_boiler = winter_boiler.crop(datetime.datetime(year=2013, month=2, day=1),
+                                       datetime.datetime(year=2013, month=3, day=1))
+    winter_boiler.name = 'boiler February 2012'
+
+    summer_boiler = Channel('/data/mine/vadeec/jack-merged', 2)
+    summer_boiler = summer_boiler.crop(datetime.datetime(year=2013, month=5, day=1),
+                                       datetime.datetime(year=2013, month=6, day=1))
+    summer_boiler.name = 'boiler May 2012'
+
+    CHANS.append(winter_boiler)
+    CHANS.append(summer_boiler)
+
+#-------------------------------------------
 
 fig = plt.figure()
 plt.clf()
@@ -34,16 +89,13 @@ def format_time(x, pos=None):
         hours = x
     return '${:d}$'.format(int(hours))
 
-n_subplots = len(CHAN_IDS)
-for chan_id in CHAN_IDS:
-    # Get channel data
-    c = Channel('/data/mine/vadeec/jack-merged', chan_id)
-    c = c.crop(START_DATE, END_DATE)
+n_subplots = len(CHANS)
+for c in CHANS:
     distribution = c.activity_distribution(bin_size=BIN_SIZE, timespan=TIMESPAN)
     x = np.arange(distribution.size)
 
     # plot
-    subplot_index = CHAN_IDS.index(chan_id) + 1
+    subplot_index = CHANS.index(c) + 1
     ax = fig.add_subplot(n_subplots, 1, subplot_index)
     ax.bar(x, distribution.values, facecolor=BAR_COLOR, edgecolor=BAR_COLOR)
 
@@ -61,44 +113,26 @@ for chan_id in CHAN_IDS:
     ax.set_xlim([0, distribution.size])
 
     # y ticks
-    # plt.locator_params(axis='y', nbins=2, tight=True)
     yticks = ax.get_yticks()
     ax.set_yticks([yticks[0], yticks[-2]])
 
     spfl.format_axes(ax)
 
     if subplot_index < n_subplots:
-        ax.xaxis.set_ticks_position('none')
         ax.set_xticklabels([])
+        if not XTICKS_ON:
+            ax.xaxis.set_ticks_position('none')
     else:
         ax.set_xlabel('hour' if TIMESPAN == 'D' else 'day')
 
     ax.spines['left'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
 
-    # Draw tick marks and labels at the very top of the figure
-    # if subplot_index == 1:
-    #     ax.spines['top'].set_visible(True)
-    #     ax.spines['top'].set_color(spfl.SPINE_COLOR)
-    #     ax.spines['top'].set_linewidth(0.5)
-    #     ax.xaxis.set_ticks_position('both')
-    #     ax.tick_params(axis='x', labelbottom=False, labeltop=True)
+    ax.set_title(c.get_long_name(), x=0.5, y=TITLE_Y, ha='center')
 
-    if subplot_index == math.ceil(n_subplots / 2):
-        ax.set_ylabel('frequency')
+    if GRID:
+        ax.xaxis.grid(color='gray')
 
-    # Add title
-#    date_format = '%d-%m-%Y'
-#    title = "Daily" if TIMESPAN=='D' else "Weekly"
-#    title += ' activity histogram for ' + c.name.replace('_', ' ')
-#    title += ' from ' + c.series.index[0].strftime(date_format)
-#    title += ' to ' + c.series.index[-1].strftime(date_format)
-#    ax.set_title(title)
-
-    ax.set_title(c.get_long_name(), x=0.05, y=0.87, ha='left')
-
-    ax.xaxis.grid(color='gray')
-
+fig.text(0.02, 0.5, 'frequency', rotation=90, va='center', ha='left', size=8)
 plt.subplots_adjust(hspace=0.4)
 plt.show()
 plt.savefig(LATEX_PDF_OUTPUT_FILENAME)

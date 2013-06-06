@@ -58,3 +58,5 @@ def format_axes(ax):
         axis.set_tick_params(direction='out', color=SPINE_COLOR)
 
     matplotlib.pyplot.tight_layout()
+
+    return ax
