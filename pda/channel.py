@@ -278,7 +278,8 @@ class Channel(object):
                        'htpc': 'home theatre PC',
                        'lcd office': 'office LCD screen',
                        'livingroom s lamp': 'livingroom standing lamp',
-                       'childs ds lamp': 'reading lamp in child\'s room'}
+                       'childs ds lamp': 'reading lamp in child\'s room',
+                       'bedroom ds lamp': 'bedroom dimmable standing lamp'}
         short_label = self.name.replace('_', ' ')
         try:
             return long_labels[short_label]
