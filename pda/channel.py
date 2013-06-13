@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import scipy.stats as stats
 import pda.load_pwr_data as load_pwr_data
-import os, copy
+import os, copy, datetime
 
 """
 Contains the Channel class (for representing a single channel or appliance)
@@ -231,6 +231,20 @@ class Channel(object):
             self.save()
 
         self._update_sample_period()
+
+    def load_high_freq_mains(self, filename, timezone=DEFAULT_TIMEZONE,
+                             param='active'):
+        """
+        Args:
+           param (str): active | apparent | volts
+        """
+
+        date_parser = lambda x: datetime.datetime.utcfromtimestamp(x)
+        df = pd.read_csv(filename, sep=' ', header=None, index_col=0,
+                          parse_dates=True, date_parser=date_parser, 
+                          names=['active','apparent','volts'])
+        df = df.tz_localize('UTC').tz_convert(timezone)
+        self.series = df[param]
 
     def save(self, data_dir=None):
         """Saves self.series to data_dir/channel_<chan>.h5
