@@ -24,6 +24,7 @@ MINIMUM_BIN_COUNT = 100
 
 for chan_id in CHAN_IDS:
     # Get channel data
+    print("loading channel", chan_id)
     c = Channel('/data/mine/vadeec/jack-merged', chan_id)
     CHANS.append(c)
 
@@ -67,6 +68,6 @@ for c in CHANS:
     ax.xaxis.set_major_locator(MaxNLocator(5))
     ax.set_title(c.get_long_name(), x=0.5, y=TITLE_Y, ha='center')
 
-plt.subplots_adjust(hspace=0.65, wspace=0.3)
-plt.show()
+plt.subplots_adjust(hspace=2, wspace=0.3)
 plt.savefig(LATEX_PDF_OUTPUT_FILENAME)
+plt.show()
