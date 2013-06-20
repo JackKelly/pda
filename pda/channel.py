@@ -245,6 +245,7 @@ class Channel(object):
                           names=['active','apparent','volts'])
         df = df.tz_localize('UTC').tz_convert(timezone)
         self.series = df[param]
+        self.name = param
 
     def save(self, data_dir=None):
         """Saves self.series to data_dir/channel_<chan>.h5
