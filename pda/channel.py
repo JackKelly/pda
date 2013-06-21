@@ -198,11 +198,11 @@ class Channel(object):
         if self.sample_period is None and self.series is not None:
             self.sample_period = get_sample_period(self.series)
 
-    def get_filename(self, data_dir=None, suffix='dat'):
+    def get_filename(self, data_dir=None, prefix='', suffix='dat'):
         data_dir = data_dir if data_dir else self.data_dir
-        return os.path.join(data_dir, 'channel_{:d}.{:s}'.format(self.chan, 
-                                                                 suffix))
-        
+        filename = prefix + 'channel_{:d}.{:s}'.format(self.chan, suffix)
+        return os.path.join(data_dir, filename)
+
     def load(self, 
              data_dir, # str
              chan, # int
@@ -232,20 +232,34 @@ class Channel(object):
 
         self._update_sample_period()
 
-    def load_high_freq_mains(self, filename, timezone=DEFAULT_TIMEZONE,
-                             param='active'):
+    def load_high_freq_mains(self, filename, param='active',
+                             timezone=DEFAULT_TIMEZONE):
         """
         Args:
+           filename (str): including full path and suffix.
            param (str): active | apparent | volts
+           timezone (str): Optional.  Defaults to DEFAULT_TIMEZONE.
         """
 
-        date_parser = lambda x: datetime.datetime.utcfromtimestamp(x)
-        df = pd.read_csv(filename, sep=' ', header=None, index_col=0,
-                          parse_dates=True, date_parser=date_parser, 
-                          names=['active','apparent','volts'])
-        df = df.tz_localize('UTC').tz_convert(timezone)
+        self.data_dir = os.path.dirname(filename)
+        hdf5_filename = os.path.splitext(filename)[0] + '.h5'
+        if (os.path.exists(hdf5_filename) and 
+            os.path.getmtime(hdf5_filename) > os.path.getmtime(filename)):
+            store = pd.HDFStore(hdf5_filename, 'r')
+            df = store['df']
+        else:
+            date_parser = lambda x: datetime.datetime.utcfromtimestamp(x)
+            df = pd.read_csv(filename, sep=' ', header=None, index_col=0,
+                             parse_dates=True, date_parser=date_parser, 
+                             names=['active','apparent','volts'])
+            df = df.tz_localize('UTC').tz_convert(timezone)
+            store = pd.HDFStore(hdf5_filename, 'w')
+            store['df'] = df
+        store.close()
+
         self.series = df[param]
         self.name = param
+        self._update_sample_period()
 
     def save(self, data_dir=None):
         """Saves self.series to data_dir/channel_<chan>.h5
@@ -294,12 +308,63 @@ class Channel(object):
                        'lcd office': 'office LCD screen',
                        'livingroom s lamp': 'livingroom standing lamp',
                        'childs ds lamp': 'reading lamp in child\'s room',
-                       'bedroom ds lamp': 'bedroom dimmable standing lamp'}
+                       'bedroom ds lamp': 'bedroom dimmable standing lamp',
+                       'kitchen lights': 'dimmable kitchen ceiling lights',}
         short_label = self.name.replace('_', ' ')
         try:
             return long_labels[short_label]
         except KeyError:
             return short_label
+
+    def normalise_power(self, voltage=None, v_norm=None, force_reload=False):
+        """Uses Hart's formula to calculate:
+
+            "admittance in the guise of 'normalized power':
+        
+            P_{Norm}(t) = 230^2 x Y(t) = (230 / V(t))^2 x P(t)
+
+            This is just the admittance adjusted by a constant scale
+            factor, resulting in the power normalized to 120 V, i.e.,
+            what the power would be if the utility provided a steady
+            120 V and the load obeyed a linear model. It is a far more
+            consistent signature than power... All of our prototype
+            NALMs use step changes in the normalized power as the
+            signature."
+
+        (equation 4, page 8 of Hart 1992)
+
+        Does not alter self.  Instead returns a normalised copy.
+
+        Args:
+            voltage (pd.Series)
+            v_norm (pd.Series).  Need to provide one of v_norm or voltage.
+            force_reload (boolean): If True then ignore any cached H5 file.
+
+        Returns:
+            p_norm (Channel)
+        """
+
+        dat_filename = self.get_filename()
+        hdf5_filename = self.get_filename(prefix='normalised_', suffix='h5')
+        p_norm = copy.copy(self)
+        p_norm.name += '_normalised'
+        if (not force_reload and os.path.exists(hdf5_filename) and 
+            os.path.getmtime(hdf5_filename) > os.path.getmtime(dat_filename)):
+            store = pd.HDFStore(hdf5_filename)
+            p_norm.series = store['normalised']
+        else:
+            if v_norm is None:
+                # Discard miliseconds
+                v_sec = voltage.to_period('S').to_timestamp()
+                v_sec = v_sec.tz_localize(voltage.index.tz)
+                v_norm = (242 / v_sec)**2
+            p_norm = p_norm.crop(v_norm.index[0], v_norm.index[-1])
+            p_norm.series *= v_norm
+            p_norm.series = p_norm.series.dropna()
+            store = pd.HDFStore(hdf5_filename)
+            store['normalised'] = p_norm.series
+        store.close()
+        return p_norm
 
     def __str__(self):
         s = ""
