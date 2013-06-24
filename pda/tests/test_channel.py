@@ -82,12 +82,64 @@ class TestChannel(unittest.TestCase):
         for alias, secs in SECS_PER_FREQ.iteritems():
             self.assertEqual(secs_per_period_alias(alias), secs)
 
+    def test_on(self):
+        pwr = [0, 0, 100, 100, 100, 100, 0, 0, 0, 100, 100, 0, 0, 100, 100]
+        rng = pd.date_range('1/1/2013', periods=len(pwr), freq='6S')
+        pwr2 = [0, 0, 0, 0]
+        rng2 = pd.date_range(rng[-1]+100, periods=len(pwr2), freq='6S')
+        series2 = pd.Series(pwr + pwr2, index = rng + rng2)
+        c2 = Channel(series=series2)
+        on = c2.on()
+        self.assertSequenceEqual(list(on.values), 
+                                 [False, False, True, True, True, True, 
+                                  False, False, False, True, True, False, 
+                                  False, True, True, False, False, False,
+                                  False, False])
+
     def test_on_off_events(self):
-        s = pd.Series([0, 0, 100, 100, 100, 0])
-        c = Channel(series=s)
+        series = pd.Series([0, 0, 100, 100, 100, 0])
+        c = Channel(series=series)
         events = c.on_off_events()
         self.assertEqual(events[2], 1)
         self.assertEqual(events[5], -1)
+
+    def test_durations(self):
+        pwr = [0, 0, 100, 100, 100, 100, 0, 0, 0, 100, 100, 0, 0, 100, 100]
+        rng = pd.date_range('1/1/2013', periods=len(pwr), freq='6S')
+        series = pd.Series(pwr, index=rng)
+        c = Channel(series=series)
+
+        # Check on-durations
+        on_durations = c.durations(on_or_off='on')
+        self.assertEqual(len(on_durations), 2)
+        self.assertEqual(on_durations[0], 6*4)
+        self.assertEqual(on_durations[1], 6*2)
+
+        # Check off-durations
+        off_durations = c.durations(on_or_off='off')
+        self.assertEqual(len(off_durations), 2)
+        self.assertEqual(off_durations[0], 6*3)
+        self.assertEqual(off_durations[1], 6*2)
+
+        # Now check that we do the correct thing when there are gaps
+        pwr2 = [0, 0, 0, 0]
+        rng2 = pd.date_range(rng[-1]+100, periods=len(pwr2), freq='6S')
+        series2 = pd.Series(pwr + pwr2, index = rng + rng2)
+        c2 = Channel(series=series2)
+
+        # Check on-durations
+        on_durations = c2.durations(on_or_off='on')
+        self.assertEqual(len(on_durations), 3)
+        self.assertEqual(on_durations[0], 6*4)
+        self.assertEqual(on_durations[1], 6*2)
+        self.assertEqual(on_durations[2], c2.max_sample_period+c2.sample_period)
+
+        # Check off-durations
+        off_durations = c2.durations(on_or_off='off')
+        self.assertEqual(len(off_durations), 2)
+        self.assertEqual(off_durations[0], 6*3)
+        self.assertEqual(off_durations[1], 6*2)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -551,7 +551,7 @@ class Channel(object):
         # add an 'off' entry whenever data is lost for > self.max_sample_period
         time_delta = np.diff(self.series.index.values)
         max_sample_period = np.timedelta64(self.max_sample_period, 's')
-        dropout_dates = self.series.index[1:][time_delta > max_sample_period]
+        dropout_dates = self.series.index[:-1][time_delta > max_sample_period]
         insert_offs = pd.Series(False, 
                                 index=dropout_dates +
                                       pd.DateOffset(seconds=self.max_sample_period))
@@ -559,17 +559,43 @@ class Channel(object):
         when_on = when_on.sort_index()
         return when_on
 
-    def on_off_events(self):
+    def on_off_events(self, min_state_duration=None):
         """Returns a pd.Series with np.int8 values.
                1 == turn-on event.
               -1 == turn-off event.
         
         Example (pseudo-code):
-            self.series = 0, 0, 100, 100, 100, 0
+            self.series = [0, 0, 100, 100, 100, 0]
             c.on_off_events()
             2:  1
             5: -1
+
+        Args:
+            min_state_duration (int or float): Optional. Seconds. If any state
+            lasts less than min_state_duration then remove that state.
         """
         on = self.on().astype(np.int8)
         events = on[1:] - on.shift(1)[1:]
-        return events[events != 0]
+        events = events[events != 0]
+        if min_state_duration is not None:
+            events = events.tz_convert('UTC')
+            delta_time = np.diff(events.index.values).astype(int)
+            i_below_thresh = np.where(delta_time < min_state_duration)[0]
+            indicies_to_drop = list(i_below_thresh) + list(i_below_thresh+1)
+            events = events.drop(events.index[indicies_to_drop])
+            events = events.tz_convert(DEFAULT_TIMEZONE)
+        
+        return events
+
+    def durations(self, on_or_off, min_state_duration=None):
+        """Returns an array describing all on or off durations (in seconds).
+
+        Args:
+            on_or_off (str): "on" or "off"
+            min_state_duration: See on_off_events()
+        """
+        events = self.on_off_events(min_state_duration=min_state_duration)
+        diff_for_mode = -2 if on_or_off == 'on' else 2
+        events_for_mode = events.diff().dropna() == diff_for_mode
+        delta_time = np.diff(events.index.values).astype(int) / 1E9
+        return delta_time[events_for_mode]
