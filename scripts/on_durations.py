@@ -17,7 +17,7 @@ LATEX_PDF_OUTPUT_FILENAME = os.path.join(FIGURE_PATH, 'on_durations.pdf')
 CHAN_IDS = [24,5,12,22,7,9,8,11,42,14,16,4]
 spfl.setup(columns=2)
 TITLE_Y = 0.7
-MINIMUM_BIN_COUNT = 15
+MINIMUM_BIN_COUNT = 5
 
 chans = []
 
@@ -34,12 +34,11 @@ fig = plt.figure()
 n_subplots = len(chans)
 for c in chans:
     subplot_index = chans.index(c) + 1
-    on_durations = c.durations('on', min_state_duration=1000)
-    on_durations = on_durations[on_durations > 20]
+    on_durations = c.durations('on', min_state_duration=100)
 
     # First get unconstrained histogram from which we will 
     # automatically find a sensible range
-    hist, bin_edges = np.histogram(on_durations, bins=20)
+    hist, bin_edges = np.histogram(on_durations, bins=10)
     above_threshold = np.where(hist > MINIMUM_BIN_COUNT)[0]
 
     if len(above_threshold) < 1:

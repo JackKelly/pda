@@ -104,7 +104,7 @@ class TestChannel(unittest.TestCase):
         self.assertEqual(events[5], -1)
 
     def test_durations(self):
-        pwr = [0, 0, 100, 100, 100, 100, 0, 0, 0, 100, 100, 0, 0, 100, 100]
+        pwr = [0, 0, 100, 100, 100, 100, 0, 0, 0, 100, 100, 0, 100, 100]
         rng = pd.date_range('1/1/2013', periods=len(pwr), freq='6S')
         series = pd.Series(pwr, index=rng)
         c = Channel(series=series)
@@ -119,7 +119,7 @@ class TestChannel(unittest.TestCase):
         off_durations = c.durations(on_or_off='off')
         self.assertEqual(len(off_durations), 2)
         self.assertEqual(off_durations[0], 6*3)
-        self.assertEqual(off_durations[1], 6*2)
+        self.assertEqual(off_durations[1], 6*1)
 
         # Now check that we do the correct thing when there are gaps
         pwr2 = [0, 0, 0, 0]
@@ -138,7 +138,13 @@ class TestChannel(unittest.TestCase):
         off_durations = c2.durations(on_or_off='off')
         self.assertEqual(len(off_durations), 2)
         self.assertEqual(off_durations[0], 6*3)
-        self.assertEqual(off_durations[1], 6*2)
+        self.assertEqual(off_durations[1], 6*1)
+
+        # Check merging events
+        on_durations = c2.durations('on', 10)
+        self.assertEqual(len(on_durations), 2)
+        self.assertEqual(on_durations[0], 6*4)
+        self.assertEqual(on_durations[1], 44)
 
 
 if __name__ == '__main__':

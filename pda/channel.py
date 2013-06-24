@@ -578,13 +578,21 @@ class Channel(object):
         events = on[1:] - on.shift(1)[1:]
         events = events[events != 0]
         if min_state_duration is not None:
-            events = events.tz_convert('UTC')
-            delta_time = np.diff(events.index.values).astype(int)
+            try:
+                tz = events.index.tzinfo
+                events = events.tz_convert('UTC')
+            except Exception as e:
+                print(e)
+            delta_time = np.diff(events.index.values).astype(int) / 1E9
             i_below_thresh = np.where(delta_time < min_state_duration)[0]
             indicies_to_drop = list(i_below_thresh) + list(i_below_thresh+1)
+#            import ipdb; ipdb.set_trace()
             events = events.drop(events.index[indicies_to_drop])
-            events = events.tz_convert(DEFAULT_TIMEZONE)
-        
+            try:
+                events = events.tz_convert(tz) # TODO: convert to old TZ
+            except Exception as e:
+                print(e)
+
         return events
 
     def durations(self, on_or_off, min_state_duration=None):
