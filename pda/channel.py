@@ -547,7 +547,9 @@ class Channel(object):
 
     def on(self):
         """Returns pd.Series with Boolean values indicating whether the
-        appliance is on (True) or off (False)."""
+        appliance is on (True) or off (False).  Adds an 'off' entry if data
+        is lost for more than self.max_sample_period.
+        """
         when_on = self.series >= self.on_power_threshold
         # add an 'off' entry whenever data is lost for > self.max_sample_period
         time_delta = np.diff(self.series.index.values)
@@ -560,8 +562,11 @@ class Channel(object):
         when_on = when_on.sort_index()
         return when_on
 
-    def on_off_events(self, min_state_duration=None):
-        """Returns a pd.Series with np.int8 values.
+    def on_off_events(self, ignore_n_off_samples=None):
+        """
+        Detects on/off switch events.
+
+        Returns a pd.Series with np.int8 values.
                1 == turn-on event.
               -1 == turn-off event.
         
@@ -572,39 +577,50 @@ class Channel(object):
             5: -1
 
         Args:
-            min_state_duration (int or float): Optional. Seconds. If any state
-            lasts less than min_state_duration then remove that state.
-        """
-        on = self.on().astype(np.int8)
-        events = on[1:] - on.shift(1)[1:]
-        events = events[events != 0]
-        if min_state_duration is not None:
-            try:
-                tz = events.index.tzinfo
-                events = events.tz_convert('UTC')
-            except Exception as e:
-                print(e)
-            delta_time = np.diff(events.index.values).astype(int) / 1E9
-            i_below_thresh = np.where(delta_time < min_state_duration)[0]
-            indicies_to_drop = list(i_below_thresh) + list(i_below_thresh+1)
-#            import ipdb; ipdb.set_trace()
-            events = events.drop(events.index[indicies_to_drop])
-            try:
-                events = events.tz_convert(tz) # TODO: convert to old TZ
-            except Exception as e:
-                print(e)
+            ignore_n_off_samples (int): Optional.  Ignore this number of 
+            off samples.  For example, if the input is [0, 100, 0, 100, 100, 0, 0]
+            then the single zero with 100 either side could be ignored if
+            ignore_n_off_samples = 1, hence only one on-event and one off-event
+            would be reported.
 
+        """
+        on = self.on()
+        
+        if ignore_n_off_samples is not None:
+            on_smoothed = pd.rolling_max(on, window=ignore_n_off_samples+1) 
+            on_smoothed.iloc[:ignore_n_off_samples] = on.iloc[:ignore_n_off_samples].values
+            on = on_smoothed.dropna()
+        
+        on = on.astype(np.int8)
+        events = on[1:] - on.shift(1)[1:]
+
+        if ignore_n_off_samples is not None:
+            i_off_events = np.where(events == -1)[0] # indicies of off-events
+            for i in range(ignore_n_off_samples):
+                events.iloc[i_off_events-i] = 0
+            events.iloc[i_off_events-ignore_n_off_samples] = -1
+
+        events = events[events != 0]
         return events
 
-    def durations(self, on_or_off, min_state_duration=None):
-        """Returns an array describing all on or off durations (in seconds).
+    def durations(self, on_or_off, ignore_n_off_samples=None):
+        """Returns an array describing length of every on or off durations (in
+        seconds).
 
         Args:
             on_or_off (str): "on" or "off"
-            min_state_duration: See on_off_events()
+            ignore_n_off_samples (int): Optional.  Ignore this number of 
+                off-samples. See on_off_events().  Only makes sense to use this
+                when on_or_off == 'on'.
+
         """
-        events = self.on_off_events(min_state_duration=min_state_duration)
-        diff_for_mode = -2 if on_or_off == 'on' else 2
-        events_for_mode = events.diff().dropna() == diff_for_mode
-        delta_time = np.diff(events.index.values).astype(int) / 1E9
-        return delta_time[events_for_mode]
+        events = self.on_off_events(ignore_n_off_samples=ignore_n_off_samples)
+        delta_time_array = np.diff(events.index.values).astype(int) / 1E9
+        delta_time = pd.Series(delta_time_array, index=events.index[:-1])
+        diff_for_mode = 1 if on_or_off == 'on' else -1
+        events_for_mode = events == diff_for_mode
+        durations = delta_time[events_for_mode]
+        if ignore_n_off_samples is not None:
+            durations = durations[durations > self.sample_period*ignore_n_off_samples]
+
+        return durations
