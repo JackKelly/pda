@@ -14,6 +14,7 @@ REQUIREMENTS:
   pytables (sudo apt-get install python-tables)
 """
 
+DD = '/data/mine/vadeec/merged/house1'
 SECS_PER_HOUR = 3600
 SECS_PER_DAY = 86400
 MINS_PER_DAY = 1440
