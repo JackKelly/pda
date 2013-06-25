@@ -141,7 +141,7 @@ class TestChannel(unittest.TestCase):
         self.assertEqual(off_durations[1], 6*1)
 
         # Check merging events
-        on_durations = c2.durations('on', 10)
+        on_durations = c2.durations('on', 1)
         self.assertEqual(len(on_durations), 2)
         self.assertEqual(on_durations[0], 6*4)
         self.assertEqual(on_durations[1], 44)
