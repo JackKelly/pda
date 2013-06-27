@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import scipy.stats as stats
 import pda.load_pwr_data as load_pwr_data
-import os, copy, datetime
+import os, copy, datetime, sys
 
 """
 Contains the Channel class (for representing a single channel or appliance)
@@ -181,7 +181,10 @@ class Channel(object):
                  on_power_threshold = DEFAULT_ON_POWER_THRESHOLD
                  ):
         self.data_dir = data_dir
-        self.chan = chan
+        if isinstance(chan, basestring):
+            self.chan = self._get_chan_id_from_label(chan)
+        else:
+            self.chan = chan
         self.sample_period = sample_period
         self.max_sample_period = max_sample_period
         self.name = name
@@ -190,10 +193,22 @@ class Channel(object):
         self.on_power_threshold = on_power_threshold
 
         # Load REDD / Jack's data
-        if data_dir is not None and chan is not None:
-            self.load(data_dir, chan, timezone)
+        if self.data_dir is not None and self.chan is not None:
+            self.load(self.data_dir, self.chan, timezone)
 
         self._update_sample_period()
+
+    def _get_chan_id_from_label(self, label):
+        labels = load_labels(self.data_dir)
+        inv_labels = {v:k for k,v in labels.items()}
+        try:
+            return int(inv_labels[label])
+        except KeyError:
+            print(label, 'not found in labels.dat.  Valid labels=',
+                  file=sys.stderr)
+            for chan, label in labels.items():
+                print('{}: {}'.format(chan, label))
+            raise
 
     def _update_sample_period(self):
         if self.sample_period is None and self.series is not None:

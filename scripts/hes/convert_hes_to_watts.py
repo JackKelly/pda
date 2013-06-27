@@ -28,9 +28,13 @@ for house_id in src_store.keys():
     df = df.ix[1:,:] # chop off first data reading because hours_delta is gap between readings
     tenth_hrs_delta_series = pd.Series(tenth_hours_delta, index=df.index)
     
+    # Convert power readings from deci-watt-hours to watts:
     df.ix[:,:LAST_PWR_COLUMN] /= tenth_hrs_delta_series
+
+    # Convert temperatures from deci-degreesC to degreeC:
     df.ix[:,LAST_PWR_COLUMN:] /= 10.0
 
+    # Save:
     dst_store[house_id] = df
     
 src_store.close()
