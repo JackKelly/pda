@@ -3,9 +3,8 @@ from __future__ import print_function, division
 from pda.channel import Channel
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator, FuncFormatter
-import numpy as np
-import os, datetime
-import setupPlottingForLaTeX as spfl
+import os
+import pda.setupPlottingForLaTeX as spfl
 
 BAR_COLOR = 'gray'
 
