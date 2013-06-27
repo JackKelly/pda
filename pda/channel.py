@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import scipy.stats as stats
 import pda.load_pwr_data as load_pwr_data
-import os, copy, datetime, sys
+import os, copy, datetime, sys, dateutil
 
 """
 Contains the Channel class (for representing a single channel or appliance)
@@ -399,6 +399,8 @@ class Channel(object):
 
     def crop(self, start_date=None, end_date=None):
         """Does not modify self.  Instead returns a cropped channel.
+        Args:
+            start_date, end_date: strings like '2013/6/15' or datetime objects
         """
 
         cropped_chan = copy.copy(self)
