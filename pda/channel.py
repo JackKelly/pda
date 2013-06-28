@@ -277,6 +277,25 @@ class Channel(object):
         self.name = param
         self._update_sample_period()
 
+    def load_wattsup(self, filename, start_time=None,
+                          timezone=DEFAULT_TIMEZONE):
+        """
+        Args:
+            filename (str): including full path and suffix.
+            start_time (str or datetime): Optional    
+        """
+
+        self.data_dir = os.path.dirname(filename)
+        data = np.genfromtxt(filename)
+        if start_time is not None:
+            rng = pd.date_range(start_time, periods=len(data), 
+                                freq='1S', tz=timezone)
+        else:
+            rng = None
+
+        self.series = pd.Series(data, index=rng)
+        self.sample_period = 1
+
     def save(self, data_dir=None):
         """Saves self.series to data_dir/channel_<chan>.h5
 
@@ -332,7 +351,9 @@ class Channel(object):
         except KeyError:
             return short_label
 
-    def normalise_power(self, voltage=None, v_norm=None, force_reload=False):
+    def normalise_power(self, voltage=None, v_norm=None, 
+                        force_reload=False, save_hdf=True, 
+                        discard_milliseconds=True):
         """Uses Hart's formula to calculate:
 
             "admittance in the guise of 'normalized power':
@@ -351,35 +372,55 @@ class Channel(object):
 
         Does not alter self.  Instead returns a normalised copy.
 
+        Optionally caches the normalised data to disk as an HDF file.
+
         Args:
             voltage (pd.Series)
             v_norm (pd.Series).  Need to provide one of v_norm or voltage.
             force_reload (boolean): If True then ignore any cached H5 file.
+            save_hdf (boolean): Defaults to True unless self.chan is None,
+                in which case save_hdf defaults to False because we need a chan
+                number to figure out the filename for the HDF file.
+            discard_milliseconds (bool): Defaults to True.  Decides whether or not
+                to discard milliseconds on the voltage timeseries.  Set this to
+                false if self.series has milisecond resolution timestamps.
 
         Returns:
             p_norm (Channel)
         """
 
-        dat_filename = self.get_filename()
-        hdf5_filename = self.get_filename(prefix='normalised_', suffix='h5')
+        if self.chan is None:
+            save_hdf = False
+
+        if save_hdf:
+            dat_filename = self.get_filename()
+            hdf5_filename = self.get_filename(prefix='normalised_', suffix='h5')
+
         p_norm = copy.copy(self)
         p_norm.name += '_normalised'
-        if (not force_reload and os.path.exists(hdf5_filename) and 
+
+        if (save_hdf and not force_reload and os.path.exists(hdf5_filename) and 
             os.path.getmtime(hdf5_filename) > os.path.getmtime(dat_filename)):
             store = pd.HDFStore(hdf5_filename)
             p_norm.series = store['normalised']
+            store.close()
         else:
             if v_norm is None:
-                # Discard miliseconds
-                v_sec = voltage.to_period('S').to_timestamp()
-                v_sec = v_sec.tz_localize(voltage.index.tz)
+                if discard_milliseconds:
+                    # Discard milliseconds
+                    v_sec = voltage.to_period('S').to_timestamp()
+                    v_sec = v_sec.tz_localize(voltage.index.tz)
+                else:
+                    v_sec = voltage
                 v_norm = (242 / v_sec)**2
             p_norm = p_norm.crop(v_norm.index[0], v_norm.index[-1])
             p_norm.series *= v_norm
             p_norm.series = p_norm.series.dropna()
-            store = pd.HDFStore(hdf5_filename)
-            store['normalised'] = p_norm.series
-        store.close()
+            if save_hdf:
+                store = pd.HDFStore(hdf5_filename)
+                store['normalised'] = p_norm.series
+                store.close()
+
         return p_norm
 
     def __str__(self):
