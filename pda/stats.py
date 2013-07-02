@@ -30,13 +30,13 @@ def plot_regression_line(ax, x_aligned, y_aligned, slope,
 
     text = ('R^2 = {:.2f}\\\\ '
             'm = {:.2f}\\\\ '
-            'n = {:d}\\;\\;\\;\\,'
+            'n = {:d}'
             .format(r_value**2, slope, x_aligned.size))
 
     text = r'\begin{eqnarray*}' + text + r'\end{eqnarray*}'
 
     ax.annotate(text,
-                ((xlim[1]-xlim[0])*0.8 + xlim[0],
+                ((xlim[1]-xlim[0])*0.6 + xlim[0],
                  (ylim[1]-ylim[0])*annotate_y),
                 color=color, size=8)
 

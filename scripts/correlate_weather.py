@@ -1,7 +1,7 @@
 #!/usr/bin/python
 from __future__ import print_function, division
 import matplotlib.pyplot as plt
-from pda.channel import Channel
+from pda.channel import Channel, DD
 import pda.metoffice as metoffice
 import pda.stats
 from scipy.stats import linregress
@@ -12,6 +12,8 @@ ON_DURATION_THRESHOLD = 0.1 # hours
 
 FIGURE_PATH = os.path.expanduser('~/Dropbox/MyWork/imperial/PhD/writing'
                                  '/papers/tetc2013/figures/')
+
+DATA_DIR = DD
 
 # Load metoffice data
 print("Opening metoffice data...")
@@ -32,7 +34,7 @@ def correlate(chan_id, weather_variable, subplot_index, annotate_y):
     # 12 = fridge vs min_temp R^2 = 0.255 (with on_power_threshold = 20)
     
     print("Opening channel data...")
-    channel = Channel('/data/mine/vadeec/jack-merged/', chan_id)
+    channel = Channel(DATA_DIR, chan_id)
 
     print("Calculating...")
     channel.on_power_threshold = 20

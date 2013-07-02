@@ -16,30 +16,37 @@ SPINE_COLOR = 'grey'
 
 # FIGURE_PRESET options:
 #   'daily usage histogram'
+#   'daily usage histogram for poster'
 #   'weekly usage histogram'
 #   'boiler seasons'
-FIGURE_PRESET = 'daily usage histogram'
+FIGURE_PRESET = 'daily usage histogram for poster'
 
-#FIGURE_PATH = os.path.expanduser('~/Dropbox/MyWork/imperial/PhD/writing'
-#                                 '/papers/tetc2013/figures/')
-FIGURE_PATH = os.path.expanduser('~/Dropbox/MyWork/imperial/PhD/writing'
-                                 '/posters/UKERCposter2013/')
+if FIGURE_PRESET.endswith('for poster'):
+    FIGURE_PATH = os.path.expanduser('~/Dropbox/MyWork/imperial/PhD/writing'
+                                     '/posters/UKERCposter2013/')
+else:
+    FIGURE_PATH = os.path.expanduser('~/Dropbox/MyWork/imperial/PhD/writing'
+                                     '/papers/tetc2013/figures/')
+
 FIGURE_SUFFIX = '.pdf'
 DATA_DIR = '/data/mine/vadeec/merged/house1'
 
-if FIGURE_PRESET == 'daily usage histogram':
+if FIGURE_PRESET in ['daily usage histogram', 'daily usage histogram for poster']:
     START_DATE = None # datetime.datetime(year=2013, month=3, day=1)
     END_DATE = None # datetime.datetime(year=2013, month=3, day=1)
     BIN_SIZE = 'T' # D (daily) or H (hourly) or T (minutely)
     TIMESPAN = 'D' # D (daily) or W (weekly)
-#    CHAN_IDS = [2,3,7,17,9,19,25,8,10,11,13,42,14,45,16]
-    CHAN_IDS = [2,3,7,25,10,42,14]
     spfl.setup(fig_height=8)
     GRID = True
-    TITLE_Y = 0.87
     XTICKS_ON = False
     LATEX_PDF_OUTPUT_FILENAME = os.path.join(FIGURE_PATH,
                                              'daily_usage_histograms'+FIGURE_SUFFIX)
+    if FIGURE_PRESET == 'daily usage histogram':
+        CHAN_IDS = [2,3,7,17,9,19,25,8,10,11,13,42,14,45,16]
+        TITLE_Y = 0.87
+    else:
+        CHAN_IDS = [2,3,7,25,10,42,14]
+        TITLE_Y = 0.95
 elif FIGURE_PRESET == 'weekly usage histogram':
     START_DATE = None # datetime.datetime(year=2013, month=3, day=1)
     END_DATE = None # datetime.datetime(year=2013, month=3, day=1)
