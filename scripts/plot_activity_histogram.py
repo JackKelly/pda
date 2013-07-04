@@ -1,6 +1,6 @@
 #!/bin/python
 from __future__ import print_function, division
-from pda.channel import Channel
+from pda.channel import Channel, DD
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -19,7 +19,7 @@ SPINE_COLOR = 'grey'
 #   'daily usage histogram for poster'
 #   'weekly usage histogram'
 #   'boiler seasons'
-FIGURE_PRESET = 'daily usage histogram for poster'
+FIGURE_PRESET = 'weekly usage histogram'
 
 if FIGURE_PRESET.endswith('for poster'):
     FIGURE_PATH = os.path.expanduser('~/Dropbox/MyWork/imperial/PhD/writing'
@@ -46,7 +46,7 @@ if FIGURE_PRESET in ['daily usage histogram', 'daily usage histogram for poster'
         TITLE_Y = 0.87
     else:
         CHAN_IDS = [2,3,7,25,10,42,14]
-        TITLE_Y = 0.95
+        TITLE_Y = 0.8
 elif FIGURE_PRESET == 'weekly usage histogram':
     START_DATE = None # datetime.datetime(year=2013, month=3, day=1)
     END_DATE = None # datetime.datetime(year=2013, month=3, day=1)
@@ -55,7 +55,7 @@ elif FIGURE_PRESET == 'weekly usage histogram':
     CHAN_IDS = [14,22]
     spfl.setup()
     GRID = False
-    TITLE_Y = 0.95
+    TITLE_Y = 0.75
     XTICKS_ON = True
     LATEX_PDF_OUTPUT_FILENAME = os.path.join(FIGURE_PATH,
                                              'weekly_usage_histograms'+FIGURE_SUFFIX)
@@ -75,19 +75,21 @@ if FIGURE_PRESET == 'boiler seasons':
     TIMESPAN = 'D' # D (daily) or W (weekly)
     spfl.setup()
     GRID = False
-    TITLE_Y = 0.95
+    TITLE_Y = 0.7
     XTICKS_ON = True
     LATEX_PDF_OUTPUT_FILENAME = os.path.join(FIGURE_PATH,
                                              'seasonal_variation'+FIGURE_SUFFIX)
-    winter_boiler = Channel('/data/mine/vadeec/jack-merged', 2)
+    print("Loading winter boiler data...")
+    winter_boiler = Channel(DATA_DIR, 2)
     winter_boiler = winter_boiler.crop(datetime.datetime(year=2013, month=2, day=1),
                                        datetime.datetime(year=2013, month=3, day=1))
-    winter_boiler.name = 'boiler February 2012'
+    winter_boiler.name = 'boiler February 2013'
 
-    summer_boiler = Channel('/data/mine/vadeec/jack-merged', 2)
-    summer_boiler = summer_boiler.crop(datetime.datetime(year=2013, month=5, day=1),
-                                       datetime.datetime(year=2013, month=6, day=1))
-    summer_boiler.name = 'boiler May 2012'
+    print("Loading summer boiler data...")
+    summer_boiler = Channel(DATA_DIR, 2)
+    summer_boiler = summer_boiler.crop(datetime.datetime(year=2013, month=6, day=1),
+                                       datetime.datetime(year=2013, month=7, day=1))
+    summer_boiler.name = 'boiler June 2013'
 
     CHANS.append(winter_boiler)
     CHANS.append(summer_boiler)
@@ -112,6 +114,7 @@ for c in CHANS:
     # plot
     subplot_index = CHANS.index(c) + 1
     ax = fig.add_subplot(n_subplots, 1, subplot_index)
+    ax.set_axis_bgcolor('#eeeeee')
     ax.bar(x, distribution.values, facecolor=BAR_COLOR, edgecolor=BAR_COLOR)
 
     # Process X tick marks and labels0
@@ -130,6 +133,8 @@ for c in CHANS:
     # y ticks
     yticks = ax.get_yticks()
     ax.set_yticks([yticks[0], yticks[-2]])
+    ylim = ax.get_ylim()
+    ax.set_ylim([ylim[0], ylim[1]*1.2])
 
     spfl.format_axes(ax)
 
@@ -148,6 +153,7 @@ for c in CHANS:
         ax.xaxis.grid(color='gray')
 
 fig.text(0.02, 0.5, 'frequency', rotation=90, va='center', ha='left', size=8)
-plt.subplots_adjust(hspace=0.4)
+plt.subplots_adjust(hspace=0.2)
 plt.savefig(LATEX_PDF_OUTPUT_FILENAME)
 # plt.show()
+print("Done!")
