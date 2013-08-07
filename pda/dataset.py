@@ -16,13 +16,15 @@ Channels and then manipulating those datasets.
 I'm using the term "dataset" to mean a list of Channels.
 """
 
-def load_dataset(data_dir='/data/mine/vadeec/jack-merged', ignore_chans=None):
+def load_dataset(data_dir='/data/mine/vadeec/jack-merged', ignore_chans=None,
+                 only_load_chans=None):
     """Loads an entire dataset directory.
 
     Args:
         data_dir (str)
         ignore_chans (list of ints or label strings): optional.  
             Don't load these channels.
+        only_load_chans (list of ints or label strings): optional.
 
     Returns:
         list of Channels
@@ -40,6 +42,11 @@ def load_dataset(data_dir='/data/mine/vadeec/jack-merged', ignore_chans=None):
                 print("Ignoring chan", chan, label)
                 continue
 
+        if only_load_chans is not None:
+            if chan not in only_load_chans and label not in only_load_chans:
+                print("Ignoring chan", chan, label)
+                continue
+
         print("Attempting to load chan", chan, label, "...", end=" ")
         sys.stdout.flush()
         try:
@@ -50,6 +57,48 @@ def load_dataset(data_dir='/data/mine/vadeec/jack-merged', ignore_chans=None):
             print("success.")
 
     return channels
+
+
+def dataset_to_dataframe(dataset):
+    d = {}
+    for ds in dataset:
+        d[ds.name] = ds.series
+    return pd.DataFrame(d)
+
+
+def crop_dataset(dataset, start_date, end_date):
+    cropped_dataset = []
+    for i in range(len(dataset)):
+        c = dataset[i].crop(start_date, end_date)
+        if len(c.series.index) > 0 and c.series.values.max() > 0:
+            cropped_dataset.append(c)
+    return cropped_dataset
+
+
+def plot_each_channel_activity(ax, dataset):
+    df = dataset_to_dataframe(dataset)
+    df_minutely = df.resample('T', how='max')
+    img = df_minutely.values
+    img[np.isnan(img)] = 0
+
+    img = np.divide(img, img.max(axis=0))
+
+    # Manually divide each channel by its max power:
+    # for i in range(img.shape[1]):
+    #     maximum = img[:,i].max()
+    #     if maximum > 3000:
+    #         maximum = 3000
+    #     img[:,i] = img[:,i] / maximum
+    #     img[:,i][img[:,i] > 1] = 1
+
+    img[np.isnan(img)] = 0
+    img = np.transpose(img)
+    ax.imshow(img, aspect='auto', interpolation='none', origin='lower')
+    ax.set_yticklabels(df_minutely.columns)
+    ax.set_yticks(np.arange(len(df_minutely.columns)))
+    for item in ax.get_yticklabels():
+        item.set_fontsize(5)
+    return ax
 
 
 def cluster_appliances_period(dataset, period, ignore_chans=[], plot=False):
