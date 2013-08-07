@@ -16,20 +16,30 @@ Channels and then manipulating those datasets.
 I'm using the term "dataset" to mean a list of Channels.
 """
 
-def load_dataset(data_dir='/data/mine/vadeec/jack-merged'):
+def load_dataset(data_dir='/data/mine/vadeec/jack-merged', ignore_chans=None):
     """Loads an entire dataset directory.
 
     Args:
         data_dir (str)
+        ignore_chans (list of ints or label strings): optional.  
+            Don't load these channels.
 
     Returns:
         list of Channels
     """
 
+    if ignore_chans is not None:
+        assert(isinstance(ignore_chans, list))
+
     channels = []
     labels = load_labels(data_dir)
     print("Found", len(labels), "entries in labels.dat")
     for chan, label in labels.iteritems():
+        if ignore_chans is not None:
+            if chan in ignore_chans or label in ignore_chans:
+                print("Ignoring chan", chan, label)
+                continue
+
         print("Attempting to load chan", chan, label, "...", end=" ")
         sys.stdout.flush()
         try:
@@ -127,6 +137,7 @@ def cluster_appliances_period(dataset, period, ignore_chans=[], plot=False):
         ax.set_xlabel('time')
         ax.set_ylabel('channel number')
     return chans_in_each_cluster
+
 
 def cluster_appliances(dataset, ignore_chans=[], period_range=None):
     if period_range is None:
