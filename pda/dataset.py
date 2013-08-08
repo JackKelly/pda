@@ -75,29 +75,37 @@ def crop_dataset(dataset, start_date, end_date):
     return cropped_dataset
 
 
-def plot_each_channel_activity(ax, dataset):
+def plot_each_channel_activity(ax, dataset, add_colorbar=False):
     df = dataset_to_dataframe(dataset)
     df_minutely = df.resample('T', how='max')
     img = df_minutely.values
     img[np.isnan(img)] = 0
 
-    img = np.divide(img, img.max(axis=0))
+#    img = np.divide(img, np.percentile(img, 80, axis=0))
+
+#    import ipdb; ipdb.set_trace()
 
     # Manually divide each channel by its max power:
-    # for i in range(img.shape[1]):
-    #     maximum = img[:,i].max()
-    #     if maximum > 3000:
-    #         maximum = 3000
-    #     img[:,i] = img[:,i] / maximum
-    #     img[:,i][img[:,i] > 1] = 1
+    for i in range(img.shape[1]):
+        maximum = np.percentile(img[:,i], 99)
+        if maximum > 3000:
+            maximum = 3000
+        img[:,i] = img[:,i] / maximum
+        img[:,i][img[:,i] > 1] = 1
 
     img[np.isnan(img)] = 0
     img = np.transpose(img)
-    ax.imshow(img, aspect='auto', interpolation='none', origin='lower')
+    im = ax.imshow(img, aspect='auto', interpolation='none', origin='lower',
+                   extent=(df_minutely.index[0].tz_convert('UTC').toordinal(), 
+                           df_minutely.index[-1].tz_convert('UTC').toordinal(), 
+                           0, df_minutely.columns.size-1))
+    if add_colorbar:
+        plt.colorbar(im)
     ax.set_yticklabels(df_minutely.columns)
     ax.set_yticks(np.arange(len(df_minutely.columns)))
     for item in ax.get_yticklabels():
-        item.set_fontsize(5)
+        item.set_fontsize(6)
+    ax.set_title('Appliance ground truth')
     return ax
 
 
