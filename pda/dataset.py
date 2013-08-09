@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import distance
 from sklearn.cluster import DBSCAN
-from sklearn import metrics
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 from itertools import cycle
 
 """
@@ -77,17 +77,18 @@ def crop_dataset(dataset, start_date, end_date):
 
 def plot_each_channel_activity(ax, dataset, add_colorbar=False):
     df = dataset_to_dataframe(dataset)
-    df_minutely = df.resample('T', how='max')
+    df_minutely = df.resample('10S', how='max')
     img = df_minutely.values
     img[np.isnan(img)] = 0
 
-#    img = np.divide(img, np.percentile(img, 80, axis=0))
-
-#    import ipdb; ipdb.set_trace()
-
-    # Manually divide each channel by its max power:
+    # Convert each channel's power consumption in watts
+    # to a value between 0 and 1 for imshow.  'Autoscale'
+    # each channel such that 1 corresponds to the maximum power
+    # for that appliance.  Can't just use the max power for the
+    # channel because some appliances briefly use much higher powers
+    # than the vast majority of the time.
     for i in range(img.shape[1]):
-        maximum = np.percentile(img[:,i], 99)
+        maximum = np.percentile(img[:,i], 99.9)
         if maximum > 3000:
             maximum = 3000
         img[:,i] = img[:,i] / maximum
@@ -96,13 +97,13 @@ def plot_each_channel_activity(ax, dataset, add_colorbar=False):
     img[np.isnan(img)] = 0
     img = np.transpose(img)
     im = ax.imshow(img, aspect='auto', interpolation='none', origin='lower',
-                   extent=(df_minutely.index[0].tz_convert('UTC').toordinal(), 
-                           df_minutely.index[-1].tz_convert('UTC').toordinal(), 
-                           0, df_minutely.columns.size-1))
+                   extent=(mdates.date2num(df_minutely.index[0]),
+                           mdates.date2num(df_minutely.index[-1]), 
+                           0, df_minutely.columns.size))
     if add_colorbar:
         plt.colorbar(im)
     ax.set_yticklabels(df_minutely.columns)
-    ax.set_yticks(np.arange(len(df_minutely.columns)))
+    ax.set_yticks(np.arange(0.5, len(df_minutely.columns)+0.5))
     for item in ax.get_yticklabels():
         item.set_fontsize(6)
     ax.set_title('Appliance ground truth')
