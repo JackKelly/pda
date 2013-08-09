@@ -77,8 +77,8 @@ def crop_dataset(dataset, start_date, end_date):
 
 def plot_each_channel_activity(ax, dataset, add_colorbar=False):
     df = dataset_to_dataframe(dataset)
-    df_minutely = df.resample('10S', how='max')
-    img = df_minutely.values
+    df = df.resample('10S', how='max')
+    img = df.values
     img[np.isnan(img)] = 0
 
     # Convert each channel's power consumption in watts
@@ -97,13 +97,13 @@ def plot_each_channel_activity(ax, dataset, add_colorbar=False):
     img[np.isnan(img)] = 0
     img = np.transpose(img)
     im = ax.imshow(img, aspect='auto', interpolation='none', origin='lower',
-                   extent=(mdates.date2num(df_minutely.index[0]),
-                           mdates.date2num(df_minutely.index[-1]), 
-                           0, df_minutely.columns.size))
+                   extent=(mdates.date2num(df.index[0]),
+                           mdates.date2num(df.index[-1]), 
+                           0, df.columns.size))
     if add_colorbar:
         plt.colorbar(im)
-    ax.set_yticklabels(df_minutely.columns)
-    ax.set_yticks(np.arange(0.5, len(df_minutely.columns)+0.5))
+    ax.set_yticklabels(df.columns)
+    ax.set_yticks(np.arange(0.5, len(df.columns)+0.5))
     for item in ax.get_yticklabels():
         item.set_fontsize(6)
     ax.set_title('Appliance ground truth')
