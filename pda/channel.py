@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import scipy.stats as stats
 import pda.load_pwr_data as load_pwr_data
-import os, copy, datetime, sys, dateutil
+import os, copy, datetime, sys
 
 """
 Contains the Channel class (for representing a single channel or appliance)
@@ -436,7 +436,6 @@ class Channel(object):
             To load normalised power from channel 5:
             load_normalised(directory=DD, high_freq_basename='mains.dat', 
                             chan=5)
-        
         """
         # Set dat_filename
         self.data_dir = data_dir

@@ -7,6 +7,7 @@ from scipy.spatial import distance
 from sklearn.cluster import DBSCAN
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+from matplotlib.ticker import FuncFormatter
 from itertools import cycle
 
 """
@@ -102,8 +103,14 @@ def plot_each_channel_activity(ax, dataset, add_colorbar=False):
                            0, df.columns.size))
     if add_colorbar:
         plt.colorbar(im)
-    ax.set_yticklabels(df.columns)
+
     ax.set_yticks(np.arange(0.5, len(df.columns)+0.5))
+
+    def formatter(x, pos):
+        x = int(x)
+        return df.columns[x]
+
+    ax.yaxis.set_major_formatter(FuncFormatter(formatter))
     for item in ax.get_yticklabels():
         item.set_fontsize(6)
     ax.set_title('Appliance ground truth')
