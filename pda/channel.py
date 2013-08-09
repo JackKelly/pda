@@ -152,6 +152,15 @@ def indicies_of_periods(datetime_index, freq):
     return period_range, period_boundaries
 
 
+def has_subsecond_resolution(series):
+    """Returns true if series.index contains sub-second resolution.
+
+    Only searches the first 1000 entries of series.index.
+    """
+    us = np.array([ts.microsecond for ts in series.index[:1000]])
+    return np.any(us > 0)
+
+
 class Channel(object):
     """
     A single channel of data.
@@ -195,8 +204,8 @@ class Channel(object):
         # Load REDD / Jack's data
         if self.data_dir is not None and self.chan is not None:
             self.load(self.data_dir, self.chan, timezone)
-
-        self._update_sample_period()
+        else:
+            self._update_sample_period()
 
     def _get_chan_id_from_label(self, label):
         labels = load_labels(self.data_dir)
@@ -258,7 +267,7 @@ class Channel(object):
         """
 
         self.data_dir = os.path.dirname(filename)
-        hdf5_filename = os.path.splitext(filename)[0] + '.h5'
+        hdf5_filename = os.path.join(self.data_dir, param + '.h5')
         if (os.path.exists(hdf5_filename) and 
             os.path.getmtime(hdf5_filename) > os.path.getmtime(filename)):
             store = pd.HDFStore(hdf5_filename, 'r')
@@ -269,7 +278,7 @@ class Channel(object):
                              parse_dates=True, date_parser=date_parser, 
                              names=['active','apparent','volts'])
             df = df.tz_localize('UTC').tz_convert(timezone)
-            store = pd.HDFStore(hdf5_filename, 'w')
+            store = pd.HDFStore(hdf5_filename, 'w', complevel=9, complib='blosc')
             store['df'] = df
         store.close()
 
@@ -304,7 +313,7 @@ class Channel(object):
             data directory.  If not provided then use self.data_dir.
         """
         hdf5_filename = self.get_filename(data_dir, suffix='h5')
-        store = pd.HDFStore(hdf5_filename)
+        store = pd.HDFStore(hdf5_filename, 'w', complevel=9, complib='blosc')
         store['series'] = self.series
         store.close()
 
@@ -351,9 +360,8 @@ class Channel(object):
         except KeyError:
             return short_label
 
-    def normalise_power(self, voltage=None, v_norm=None, 
-                        force_reload=False, save_hdf=True, 
-                        discard_milliseconds=True):
+    def normalise_power(self, voltage=None, v_norm=None,
+                        use_subsecond_data=None):
         """Uses Hart's formula to calculate:
 
             "admittance in the guise of 'normalized power':
@@ -372,56 +380,102 @@ class Channel(object):
 
         Does not alter self.  Instead returns a normalised copy.
 
-        Optionally caches the normalised data to disk as an HDF file.
-
         Args:
             voltage (pd.Series)
             v_norm (pd.Series).  Need to provide one of v_norm or voltage.
-            force_reload (boolean): If True then ignore any cached H5 file.
-            save_hdf (boolean): Defaults to True unless self.chan is None,
-                in which case save_hdf defaults to False because we need a chan
-                number to figure out the filename for the HDF file.
-            discard_milliseconds (bool): Defaults to True.  Decides whether or not
-                to discard milliseconds on the voltage timeseries.  Set this to
-                false if self.series has milisecond resolution timestamps.
+            use_subsecond_data (bool): Optional.  Decides whether or not
+                to discard subsecond data on the voltage timeseries. Default
+                is to use subsecond data only if it is available on both self
+                and voltage.
 
         Returns:
             p_norm (Channel)
         """
-
-        if self.chan is None:
-            save_hdf = False
-
-        if save_hdf:
-            dat_filename = self.get_filename()
-            hdf5_filename = self.get_filename(prefix='normalised_', suffix='h5')
-
+        
+        assert(voltage is not None or v_norm is not None)
         p_norm = copy.copy(self)
         p_norm.name += '_normalised'
 
-        if (save_hdf and not force_reload and os.path.exists(hdf5_filename) and 
-            os.path.getmtime(hdf5_filename) > os.path.getmtime(dat_filename)):
-            store = pd.HDFStore(hdf5_filename)
-            p_norm.series = store['normalised']
-            store.close()
-        else:
-            if v_norm is None:
-                if discard_milliseconds:
-                    # Discard milliseconds
-                    v_sec = voltage.to_period('S').to_timestamp()
-                    v_sec = v_sec.tz_localize(voltage.index.tz)
-                else:
-                    v_sec = voltage
-                v_norm = (242 / v_sec)**2
-            p_norm = p_norm.crop(v_norm.index[0], v_norm.index[-1])
-            p_norm.series *= v_norm
-            p_norm.series = p_norm.series.dropna()
-            if save_hdf:
-                store = pd.HDFStore(hdf5_filename)
-                store['normalised'] = p_norm.series
-                store.close()
+        if use_subsecond_data is None:
+            use_subsecond_data = (has_subsecond_resolution(self.series) and 
+                                  has_subsecond_resolution(v_norm if voltage is None
+                                                           else voltage))
+
+        if v_norm is None:
+            v_norm = (242 / voltage)**2
+
+        if not use_subsecond_data:
+            # Discard sub-second data
+            v_norm = v_norm.to_period('S').to_timestamp()
+            v_norm = v_norm.tz_localize(v_norm.index.tz)
+
+        p_norm.series *= v_norm
+        p_norm.series = p_norm.series.dropna()
 
         return p_norm
+
+    def load_normalised(self, data_dir=None, high_freq_basename='mains.dat', 
+                        chan=None, high_freq_param=None, force_reload=False,
+                        timezone=DEFAULT_TIMEZONE):
+        """
+        Loads normalised power.
+
+        Args:
+            data_dir (str): Required.
+            high_freq_basename (str): Defaults to 'mains.dat'
+            chan (int): Optional.
+            high_freq_param (str): Optional. active | apparent
+            force_reload (boolean): Default=False. If True then ignore cached H5
+            timezone: Defaults to DEFAULT_TIMEZONE
+
+        Examples:
+            To load normalised active power from SCPM data file:
+            load_normalised(directory=DD, high_freq_basename='mains.dat', 
+                            high_freq_param='active')
+
+            To load normalised power from channel 5:
+            load_normalised(directory=DD, high_freq_basename='mains.dat', 
+                            chan=5)
+        
+        """
+        # Set dat_filename
+        self.data_dir = data_dir
+        self.chan = chan
+        high_freq_filename = os.path.join(self.data_dir, high_freq_basename)
+        if chan is None:
+            dat_filename = high_freq_filename
+            self.name = ('normalised_' + high_freq_param + '_' +
+                         os.path.splitext(high_freq_basename)[0])
+            hdf5_filename = os.path.join(self.data_dir, self.name + '.h5')
+        else:
+            dat_filename = self.get_filename()
+            hdf5_filename = self.get_filename(prefix='normalised_', suffix='h5')
+
+        if (not force_reload and os.path.exists(hdf5_filename) and 
+            os.path.getmtime(hdf5_filename) > os.path.getmtime(dat_filename)):
+            # Load the cached HDF5 file
+            store = pd.HDFStore(hdf5_filename, 'r')
+            self.series = store['normalised']
+            store.close()
+            self._update_sample_period()
+        else:
+            # Load the raw dat file
+            if chan is None:
+                self.load_high_freq_mains(high_freq_filename, 
+                                          param=high_freq_param,
+                                          timezone=timezone)
+            else:
+                self.load(self.data_dir, self.chan, timezone=timezone)
+
+            v = Channel()
+            v.load_high_freq_mains(high_freq_filename, 'volts',
+                                   timezone=timezone)
+
+            self = self.normalise_power(voltage=v.series)
+
+            store = pd.HDFStore(hdf5_filename, 'w', complevel=9, complib='blosc')
+            store['normalised'] = self.series
+            store.close()
 
     def __str__(self):
         s = ""
