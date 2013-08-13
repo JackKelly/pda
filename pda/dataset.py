@@ -1,5 +1,5 @@
 from __future__ import print_function, division
-from pda.channel import Channel, load_labels
+from pda.channel import Channel, load_labels, DD
 import sys
 import numpy as np
 import pandas as pd
@@ -117,6 +117,83 @@ def plot_each_channel_activity(ax, dataset, add_colorbar=False):
     return ax
 
 
+def init_aggregate_and_appliance_dataset_figure(
+        start_date, end_date, n_subplots=2, 
+        aggregate_type='one second', plot_both_aggregate_signals=False, 
+        data_dir=DD, plot_appliance_ground_truth=True, ignore_chans=None):
+    """Initialise a basic figure with multiple subplots.  Plot aggregate
+    data.  Optionally plot appliance ground truth dataset.
+
+    Args:
+        start_date, end_date (str): Required.  e.g. '2013/6/4 18:00'
+        n_subplots (int): Required.  Must be >= 1.  Includes aggregate and 
+            appliance ground truth plots.
+        aggregate_type (str): 'one second' or 'current cost'.  The flavour of 
+            aggregate data to load, plot and return.
+        plot_both_aggregate_signals (bool): Default==False. Plot both flavours
+            of aggregate data?  Has no effect on which flavour is returned.
+        data_dir (str): Default=DD
+        plot_appliance_ground_truth (bool): Default==True
+        ignore_chans (list of strings or ints): Defaults to a standard list of 
+            channels to ignore.
+
+    Returns:
+        subplots (list of axes), 
+        chan (pda.Channel)
+
+    """
+    if plot_appliance_ground_truth:
+        assert(n_subplots >= 2)
+    else:
+        assert(n_subplots >= 1)
+
+    # Initialise figure and subplots
+    fig = plt.figure()
+    fig.canvas.set_window_title(start_date + ' - ' + end_date)
+    subplots = [fig.add_subplot(n_subplots, 1, 1)]
+    for i in range(2, n_subplots+1):
+        subplots.append(fig.add_subplot(n_subplots, 1, i, sharex=subplots[0]))
+
+    # Load and plot aggregate channel(s)
+    if aggregate_type=='one second' or plot_both_aggregate_signals:
+        print('Loading high freq mains...')
+        one_sec = Channel()
+        one_sec.load_normalised(data_dir, high_freq_basename='mains.dat', 
+                                high_freq_param='active')
+        one_sec = one_sec.crop(start_date, end_date)
+        one_sec.plot(subplots[0], color='k')
+
+    if aggregate_type=='current cost' or plot_both_aggregate_signals:
+        print('Loading Current Cost aggregate...')
+        cc = Channel(data_dir, 'aggregate') # cc = Current cost
+        cc = cc.crop(start_date, end_date)
+        cc.plot(subplots[0], color='r')
+
+    subplots[0].set_title('Aggregate. 1s active power, normalised.')
+    subplots[0].legend()
+    chan = one_sec if aggregate_type=='one second' else cc
+
+    if plot_appliance_ground_truth:
+        print('Loading appliance ground truth dataset...')
+        if ignore_chans is None:
+            ignore_chans=['aggregate', 'amp_livingroom', 'adsl_router',
+                          'livingroom_s_lamp', 'gigE_&_USBhub',
+                          'livingroom_s_lamp2', 'iPad_charger', 
+                          'subwoofer_livingroom', 'livingroom_lamp_tv',
+                          'DAB_radio_livingroom', 'kitchen_lamp2',
+                          'kitchen_phone&stereo', 'utilityrm_lamp', 
+                          'samsung_charger', 'kitchen_radio', 
+                          'bedroom_chargers', 'data_logger_pc', 
+                          'childs_table_lamp', 'baby_monitor_tx',
+                          'battery_charger', 'office_lamp1', 'office_lamp2',
+                          'office_lamp3', 'gigE_switch']
+        ds = load_dataset(data_dir, ignore_chans=ignore_chans)
+        ds = crop_dataset(ds, start_date, end_date)
+        plot_each_channel_activity(subplots[1], ds)
+
+    return subplots, chan
+
+
 def cluster_appliances_period(dataset, period, ignore_chans=[], plot=False):
     """
     Args:
@@ -177,8 +254,6 @@ def cluster_appliances_period(dataset, period, ignore_chans=[], plot=False):
             col = 'k'
             markersize = 6
         class_members = [index[0] for index in np.argwhere(labels == k)]
-        cluster_core_samples = [index for index in core_samples
-                                if labels[index] == k]
 
         if k != -1:
             chans_in_each_cluster.append(set(merged_events.ix[class_members]))
@@ -222,3 +297,5 @@ def cluster_appliances(dataset, ignore_chans=[], period_range=None):
     # Sort by count; highest count first
     freqs.sort(key=lambda x: x[1], reverse=True)
     return freqs
+
+

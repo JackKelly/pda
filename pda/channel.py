@@ -4,6 +4,7 @@ import numpy as np
 import scipy.stats as stats
 import pda.load_pwr_data as load_pwr_data
 import os, copy, datetime, sys
+import matplotlib.dates as mdates
 
 """
 Contains the Channel class (for representing a single channel or appliance)
@@ -735,3 +736,10 @@ class Channel(object):
             durations = durations[durations > self.sample_period*ignore_n_off_samples]
 
         return durations
+
+    def plot(self, ax, color=None, label=None):
+        ax.xaxis.axis_date(tz=self.series.index.tzinfo)
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%y %H:%M:%S'))
+        label = label if label else self.name
+        ax.plot(self.series.index, self.series, color=color, label=label)
+        ax.set_ylabel('watts')        
