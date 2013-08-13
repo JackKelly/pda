@@ -120,7 +120,8 @@ def plot_each_channel_activity(ax, dataset, add_colorbar=False):
 def init_aggregate_and_appliance_dataset_figure(
         start_date, end_date, n_subplots=2, 
         aggregate_type='one second', plot_both_aggregate_signals=False, 
-        data_dir=DD, plot_appliance_ground_truth=True, ignore_chans=None):
+        data_dir=DD, plot_appliance_ground_truth=True, ignore_chans=None,
+        **kwargs):
     """Initialise a basic figure with multiple subplots.  Plot aggregate
     data.  Optionally plot appliance ground truth dataset.
 
@@ -136,7 +137,7 @@ def init_aggregate_and_appliance_dataset_figure(
         plot_appliance_ground_truth (bool): Default==True
         ignore_chans (list of strings or ints): Defaults to a standard list of 
             channels to ignore.
-
+        **kwargs: passed to ax.plot
     Returns:
         subplots (list of axes), 
         chan (pda.Channel)
@@ -162,13 +163,13 @@ def init_aggregate_and_appliance_dataset_figure(
                                 high_freq_param='active')
         print('Cropping...')
         one_sec = one_sec.crop(start_date, end_date)
-        one_sec.plot(subplots[0], color='k')
+        one_sec.plot(subplots[0], color='k', **kwargs)
 
     if aggregate_type=='current cost' or plot_both_aggregate_signals:
         print('Loading Current Cost aggregate...')
         cc = Channel(data_dir, 'aggregate') # cc = Current cost
         cc = cc.crop(start_date, end_date)
-        cc.plot(subplots[0], color='r')
+        cc.plot(subplots[0], color='r', **kwargs)
 
     subplots[0].set_title('Aggregate. 1s active power, normalised.')
     subplots[0].legend()

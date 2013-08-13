@@ -738,9 +738,9 @@ class Channel(object):
 
         return durations
 
-    def plot(self, ax, color=None, label=None):
+    def plot(self, ax, label=None, date_format='%d/%m/%y %H:%M:%S', **kwargs):
         ax.xaxis.axis_date(tz=self.series.index.tzinfo)
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%y %H:%M:%S'))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter(date_format))
         label = label if label else self.name
-        ax.plot(self.series.index, self.series, color=color, label=label)
+        ax.plot(self.series.index, self.series, label=label, **kwargs)
         ax.set_ylabel('watts')        
