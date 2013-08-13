@@ -160,6 +160,7 @@ def init_aggregate_and_appliance_dataset_figure(
         one_sec = Channel()
         one_sec.load_normalised(data_dir, high_freq_basename='mains.dat', 
                                 high_freq_param='active')
+        print('Cropping...')
         one_sec = one_sec.crop(start_date, end_date)
         one_sec.plot(subplots[0], color='k')
 

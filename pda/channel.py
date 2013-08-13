@@ -268,7 +268,7 @@ class Channel(object):
         """
 
         self.data_dir = os.path.dirname(filename)
-        hdf5_filename = os.path.join(self.data_dir, param + '.h5')
+        hdf5_filename = os.path.splitext(filename)[0] + '.h5'
         if (os.path.exists(hdf5_filename) and 
             os.path.getmtime(hdf5_filename) > os.path.getmtime(filename)):
             store = pd.HDFStore(hdf5_filename, 'r')
@@ -279,6 +279,7 @@ class Channel(object):
                              parse_dates=True, date_parser=date_parser, 
                              names=['active','apparent','volts'])
             df = df.tz_localize('UTC').tz_convert(timezone)
+            df = df.astype(np.float32)
             store = pd.HDFStore(hdf5_filename, 'w', complevel=9, complib='blosc')
             store['df'] = df
         store.close()
@@ -401,14 +402,14 @@ class Channel(object):
             use_subsecond_data = (has_subsecond_resolution(self.series) and 
                                   has_subsecond_resolution(v_norm if voltage is None
                                                            else voltage))
-
         if v_norm is None:
             v_norm = (242 / voltage)**2
 
         if not use_subsecond_data:
             # Discard sub-second data
+            v_norm_tz = v_norm.index.tz
             v_norm = v_norm.to_period('S').to_timestamp()
-            v_norm = v_norm.tz_localize(v_norm.index.tz)
+            v_norm = v_norm.tz_localize(v_norm_tz)
 
         p_norm.series *= v_norm
         p_norm.series = p_norm.series.dropna()
