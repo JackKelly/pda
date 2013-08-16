@@ -114,7 +114,6 @@ def plot_each_channel_activity(ax, dataset, add_colorbar=False):
     for item in ax.get_yticklabels():
         item.set_fontsize(6)
     ax.set_title('Appliance ground truth')
-    print("img.shape=", img.shape)
     for i in range(1,img.shape[0]): # Plot horizontal white lines
         ax.plot([start_datenum, end_datenum], [i, i], color='w', linewidth=1)
     return ax
