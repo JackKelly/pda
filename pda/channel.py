@@ -28,7 +28,7 @@ ACCEPTABLE_DROPOUT_RATE_IF_NOT_UNPLUGGED = 0.2
 DEFAULT_ON_POWER_THRESHOLD = 3
 
 
-def secs_per_period_alias(alias):
+def _secs_per_period_alias(alias):
     """Seconds for each period length."""
     period = pd.Period('00:00', alias)
     return (period.end_time - period.start_time).total_seconds()
@@ -55,7 +55,7 @@ def load_labels(data_dir):
     return labels
 
 
-def load_sometimes_unplugged(data_dir):
+def _load_sometimes_unplugged(data_dir):
     """Loads data_dir/sometimes_unplugged.dat file and returns a
     list of strings.  Returns an empty list if file doesn't exist.
     """
@@ -69,7 +69,7 @@ def load_sometimes_unplugged(data_dir):
         return [line.strip() for line in lines if line.strip()]
 
 
-def get_sample_period(series):
+def _get_sample_period(series):
     """Find the sample period by finding the stats.mode of the 
     forward difference.  Only use the first 100 samples (for speed).
     Returns period in seconds (float).
@@ -79,7 +79,7 @@ def get_sample_period(series):
     return mode_fwd_diff / 1E9
 
 
-def indicies_of_periods(datetime_index, freq):
+def _indicies_of_periods(datetime_index, freq):
     """
     Args:
         datetime_index (pd.tseries.index.DatetimeIndex)
@@ -116,7 +116,7 @@ def indicies_of_periods(datetime_index, freq):
     # For the sake of speed, only use the first 100 samples.
     FWD_DIFF = np.diff(datetime_index.values[:100]).astype(np.float)
     MIN_SAMPLE_PERIOD = FWD_DIFF.min() / 1E9
-    MAX_SAMPLES_PER_PERIOD = secs_per_period_alias(freq) / MIN_SAMPLE_PERIOD
+    MAX_SAMPLES_PER_PERIOD = _secs_per_period_alias(freq) / MIN_SAMPLE_PERIOD
     MAX_SAMPLES_PER_2_PERIODS = MAX_SAMPLES_PER_PERIOD * 2
     n_rows_processed = 0
     period_boundaries = {}
@@ -153,7 +153,7 @@ def indicies_of_periods(datetime_index, freq):
     return period_range, period_boundaries
 
 
-def has_subsecond_resolution(series):
+def _has_subsecond_resolution(series):
     """Returns true if series.index contains sub-second resolution.
 
     Only searches the first 1000 entries of series.index.
@@ -225,9 +225,9 @@ class Channel(object):
     def _update_sample_period(self):
         if (self.sample_period is None and 
             self.series is not None and self.series.size):
-            self.sample_period = get_sample_period(self.series)
+            self.sample_period = _get_sample_period(self.series)
 
-    def get_filename(self, data_dir=None, prefix='', suffix='dat'):
+    def _get_filename(self, data_dir=None, prefix='', suffix='dat'):
         data_dir = data_dir if data_dir else self.data_dir
         filename = prefix + 'channel_{:d}.{:s}'.format(self.chan, suffix)
         return os.path.join(data_dir, filename)
@@ -249,8 +249,8 @@ class Channel(object):
         self.chan = chan
         self._load_metadata()
         
-        dat_filename = self.get_filename()
-        hdf5_filename = self.get_filename(suffix='h5')
+        dat_filename = self._get_filename()
+        hdf5_filename = self._get_filename(suffix='h5')
         load_dat_func = lambda: self._load_pwr_data(dat_filename, timezone)
         self._load_cropped_hdf5(hdf5_filename, dat_filename, start_date, 
                                 end_date, force_reload, load_dat_func)
@@ -319,7 +319,7 @@ class Channel(object):
                 data directory.  If not provided then use self.data_dir.
         """
         if hdf5_filename is None:
-            hdf5_filename = self.get_filename(data_dir, suffix='h5')
+            hdf5_filename = self._get_filename(data_dir, suffix='h5')
         store = pd.HDFStore(hdf5_filename, 'w', complevel=9, complib='blosc')
         if self.series is not None and self.series.size:
             store['series'] = self.series
@@ -386,7 +386,7 @@ class Channel(object):
         self.name = labels.get(self.chan, "")
 
         # load sometimes_unplugged file
-        if self.name in load_sometimes_unplugged(self.data_dir):
+        if self.name in _load_sometimes_unplugged(self.data_dir):
             self.acceptable_dropout_rate = ACCEPTABLE_DROPOUT_RATE_IF_SOMETIMES_UNPLUGGED 
 
         # load custom on power thresholds
@@ -460,8 +460,8 @@ class Channel(object):
         p_norm.name += '_normalised'
 
         if use_subsecond_data is None:
-            use_subsecond_data = (has_subsecond_resolution(self.series) and 
-                                  has_subsecond_resolution(v_norm if voltage is None
+            use_subsecond_data = (_has_subsecond_resolution(self.series) and 
+                                  _has_subsecond_resolution(v_norm if voltage is None
                                                            else voltage))
         if v_norm is None:
             v_norm = (242 / voltage)**2
@@ -514,8 +514,8 @@ class Channel(object):
                          os.path.splitext(high_freq_basename)[0])
             hdf5_filename = os.path.join(self.data_dir, self.name + '.h5')
         else:
-            dat_filename = self.get_filename()
-            hdf5_filename = self.get_filename(prefix='normalised_', suffix='h5')
+            dat_filename = self._get_filename()
+            hdf5_filename = self._get_filename(prefix='normalised_', suffix='h5')
 
         load_dat_func = lambda: self._load_dat_and_normalise(high_freq_filename,
                                                              high_freq_param, 
@@ -569,7 +569,7 @@ class Channel(object):
     def usage_per_period(self, freq, tz_convert=None, verbose=False):
         """
         Args:
-            freq (str): see indicies_of_periods() for acceptable values.
+            freq (str): see _indicies_of_periods() for acceptable values.
 
             tz_convert (str): (optional) e.g. 'UTC' or 'Europe/London'
 
@@ -594,13 +594,13 @@ class Channel(object):
         series = (self.series if tz_convert is None else
                   self.series.tz_convert(tz_convert))
 
-        period_range, period_boundaries = indicies_of_periods(series.index,freq)
+        period_range, period_boundaries = _indicies_of_periods(series.index,freq)
         hours_on = pd.Series(index=period_range, dtype=np.float, 
                              name=self.name+' hours on')
         kwh = pd.Series(index=period_range, dtype=np.float, 
                         name=self.name+' kWh')
 
-        MAX_SAMPLES_PER_PERIOD = secs_per_period_alias(freq) / self.sample_period
+        MAX_SAMPLES_PER_PERIOD = _secs_per_period_alias(freq) / self.sample_period
         MIN_SAMPLES_PER_PERIOD = (MAX_SAMPLES_PER_PERIOD *
                                   (1-self.acceptable_dropout_rate))
 
@@ -689,7 +689,7 @@ class Channel(object):
         binned_data = self.series.resample(bin_size, how='max').to_period()
         binned_data = binned_data > self.on_power_threshold
 
-        timespans, boundaries = indicies_of_periods(binned_data.index.to_timestamp(),
+        timespans, boundaries = _indicies_of_periods(binned_data.index.to_timestamp(),
                                                     timespan)
 
         first_timespan = timespans[0]
@@ -698,8 +698,8 @@ class Channel(object):
                                freq=bin_size)
         distribution = pd.Series(0, index=bins)
         
-        bins_per_timespan = int(round(secs_per_period_alias(timespan) /
-                                      secs_per_period_alias(bin_size)))
+        bins_per_timespan = int(round(_secs_per_period_alias(timespan) /
+                                      _secs_per_period_alias(bin_size)))
 
         for span in timespans:
             try:
