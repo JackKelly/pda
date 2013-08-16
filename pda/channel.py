@@ -188,7 +188,9 @@ class Channel(object):
                  series=None, # pd.Series
                  name="", # str
                  acceptable_dropout_rate = ACCEPTABLE_DROPOUT_RATE_IF_NOT_UNPLUGGED,
-                 on_power_threshold = DEFAULT_ON_POWER_THRESHOLD
+                 on_power_threshold = DEFAULT_ON_POWER_THRESHOLD,
+                 start_date=None, # str
+                 end_date=None # str
                  ):
         self.data_dir = data_dir
         if isinstance(chan, basestring):
@@ -204,7 +206,7 @@ class Channel(object):
 
         # Load REDD / Jack's data
         if self.data_dir is not None and self.chan is not None:
-            self.load(self.data_dir, self.chan, timezone)
+            self._load(self.data_dir, self.chan, timezone, start_date, end_date)
         else:
             self._update_sample_period()
 
@@ -221,7 +223,8 @@ class Channel(object):
             raise
 
     def _update_sample_period(self):
-        if self.sample_period is None and self.series is not None:
+        if (self.sample_period is None and 
+            self.series is not None and self.series.size):
             self.sample_period = get_sample_period(self.series)
 
     def get_filename(self, data_dir=None, prefix='', suffix='dat'):
@@ -229,10 +232,12 @@ class Channel(object):
         filename = prefix + 'channel_{:d}.{:s}'.format(self.chan, suffix)
         return os.path.join(data_dir, filename)
 
-    def load(self, 
-             data_dir, # str
-             chan, # int
-             timezone=DEFAULT_TIMEZONE # str
+    def _load(self, 
+              data_dir, # str
+              chan, # int
+              timezone=DEFAULT_TIMEZONE, # str
+              start_date=None, end_date=None, # str
+              force_reload=False
              ):
         """Load power data.  If an HDF5 (.h5) file exists for this channel
         and if that .h5 file is newer than the corresponding .dat file then
@@ -242,20 +247,17 @@ class Channel(object):
 
         self.data_dir = data_dir
         self.chan = chan
-        self.load_metadata()
+        self._load_metadata()
         
         dat_filename = self.get_filename()
         hdf5_filename = self.get_filename(suffix='h5')
-        if (os.path.exists(hdf5_filename) and 
-            os.path.getmtime(hdf5_filename) > os.path.getmtime(dat_filename)):
-            store = pd.HDFStore(hdf5_filename)
-            self.series = store['series']
-            store.close()
-        else:
-            self.series = load_pwr_data.load(dat_filename, tz=timezone)
-            self.series = self.series.sort_index() # MIT REDD data isn't always in order
-            self.save()
+        load_dat_func = lambda: self._load_pwr_data(dat_filename, timezone)
+        self._load_cropped_hdf5(hdf5_filename, dat_filename, start_date, 
+                                end_date, force_reload, load_dat_func)
 
+    def _load_pwr_data(self, dat_filename, timezone):
+        self.series = load_pwr_data.load(dat_filename, tz=timezone)
+        self.series = self.series.sort_index() # MIT REDD data isn't always in order
         self._update_sample_period()
 
     def load_high_freq_mains(self, filename, param='active',
@@ -307,19 +309,78 @@ class Channel(object):
         self.series = pd.Series(data, index=rng)
         self.sample_period = 1
 
-    def save(self, data_dir=None):
-        """Saves self.series to data_dir/channel_<chan>.h5
+    def _save_hdf5(self, data_dir=None, hdf5_filename=None):
+        """Saves self.series to HDF5 file.
 
         Args:
+            hdf5_filename (str): optional. Full filename including path 
+                and suffix.  Defaults to data_dir/channel_<chan>.h5
             data_dir (str): optional.  If provided then save hdf5 file to this
-            data directory.  If not provided then use self.data_dir.
+                data directory.  If not provided then use self.data_dir.
         """
-        hdf5_filename = self.get_filename(data_dir, suffix='h5')
+        if hdf5_filename is None:
+            hdf5_filename = self.get_filename(data_dir, suffix='h5')
         store = pd.HDFStore(hdf5_filename, 'w', complevel=9, complib='blosc')
-        store['series'] = self.series
+        if self.series is not None and self.series.size:
+            store['series'] = self.series
         store.close()
 
-    def load_metadata(self):
+    def _load_hdf5(self, hdf5_filename):
+        """Loads HDF5 file to self.series.
+
+        Args:
+            hdf5_filename (str): optional. Full filename including path 
+                and suffix.
+        """
+        store = pd.HDFStore(hdf5_filename, 'r')
+        try:
+            self.series = store['series']
+        except KeyError as e:
+            self.series = None
+            if str(e) == '\'No object named series in the file\'':
+                print('no data in HDF5 file, probably just inactive. ', end='')
+            else:
+                raise
+        store.close()
+        self._update_sample_period()
+
+    def _load_cropped_hdf5(self, hdf5_filename, dat_filename,
+                           start_date, end_date, force_reload, load_dat_func):
+        # Now handle loading of cropped data
+        def date_to_str(date):
+            return pd.datetools.parse(date).strftime('%s') if date else "_"
+
+        hdf5_cropped_data_fname = None
+        if start_date or end_date:
+            date_range_str = "-"
+            date_range_str += date_to_str(start_date)
+            date_range_str += "-to-"
+            date_range_str += date_to_str(end_date)
+            hdf5_cropped_data_fname = (os.path.splitext(hdf5_filename)[0] + 
+                                       date_range_str + '.h5')
+
+        # Load the data
+        if (not force_reload and hdf5_cropped_data_fname and 
+            os.path.exists(hdf5_cropped_data_fname) and 
+            os.path.getmtime(hdf5_cropped_data_fname) > os.path.getmtime(dat_filename)):
+            # Load the cached, cropped and normalised HDF5 file
+            self._load_hdf5(hdf5_cropped_data_fname)
+        elif (not force_reload and os.path.exists(hdf5_filename) and 
+              os.path.getmtime(hdf5_filename) > os.path.getmtime(dat_filename)):
+            # Load the cached (but not cropped) HDF5 file
+            self._load_hdf5(hdf5_filename)
+            if start_date or end_date:
+                self.series = self.crop(start_date, end_date).series
+                self._save_hdf5(hdf5_filename=hdf5_cropped_data_fname)
+        else:
+            # Load the raw dat file
+            load_dat_func()
+            self._save_hdf5(hdf5_filename=hdf5_filename)
+            if start_date or end_date:
+                self.series = self.crop(start_date, end_date).series
+                self._save_hdf5(hdf5_filename=hdf5_cropped_data_fname)
+
+    def _load_metadata(self):
         # load labels file
         labels = load_labels(self.data_dir)
         self.name = labels.get(self.chan, "")
@@ -418,9 +479,12 @@ class Channel(object):
 
     def load_normalised(self, data_dir=None, high_freq_basename='mains.dat', 
                         chan=None, high_freq_param=None, force_reload=False,
+                        start_date=None, end_date=None,
                         timezone=DEFAULT_TIMEZONE):
         """
         Loads normalised power.
+
+        Caches normalised power to disk as HDF5 file.
 
         Args:
             data_dir (str): Required.
@@ -429,6 +493,7 @@ class Channel(object):
             high_freq_param (str): Optional. active | apparent
             force_reload (boolean): Default=False. If True then ignore cached H5
             timezone: Defaults to DEFAULT_TIMEZONE
+            start_date, end_date (str)
 
         Examples:
             To load normalised active power from SCPM data file:
@@ -439,7 +504,7 @@ class Channel(object):
             load_normalised(directory=DD, high_freq_basename='mains.dat', 
                             chan=5)
         """
-        # Set dat_filename
+        # First, set dat_filename and hdf5_filename:
         self.data_dir = data_dir
         self.chan = chan
         high_freq_filename = os.path.join(self.data_dir, high_freq_basename)
@@ -452,31 +517,25 @@ class Channel(object):
             dat_filename = self.get_filename()
             hdf5_filename = self.get_filename(prefix='normalised_', suffix='h5')
 
-        if (not force_reload and os.path.exists(hdf5_filename) and 
-            os.path.getmtime(hdf5_filename) > os.path.getmtime(dat_filename)):
-            # Load the cached HDF5 file
-            store = pd.HDFStore(hdf5_filename, 'r')
-            self.series = store['normalised']
-            store.close()
-            self._update_sample_period()
+        load_dat_func = lambda: self._load_dat_and_normalise(high_freq_filename,
+                                                             high_freq_param, 
+                                                             timezone)
+
+        self._load_cropped_hdf5(hdf5_filename, dat_filename, 
+                                start_date, end_date, force_reload,
+                                load_dat_func)
+
+    def _load_dat_and_normalise(self, high_freq_filename, high_freq_param, 
+                                timezone):
+        if self.chan is None:
+            self.load_high_freq_mains(high_freq_filename, 
+                                      param=high_freq_param, timezone=timezone)
         else:
-            # Load the raw dat file
-            if chan is None:
-                self.load_high_freq_mains(high_freq_filename, 
-                                          param=high_freq_param,
-                                          timezone=timezone)
-            else:
-                self.load(self.data_dir, self.chan, timezone=timezone)
+            self.load(self.data_dir, self.chan, timezone=timezone)
 
-            v = Channel()
-            v.load_high_freq_mains(high_freq_filename, 'volts',
-                                   timezone=timezone)
-
-            self = self.normalise_power(voltage=v.series)
-
-            store = pd.HDFStore(hdf5_filename, 'w', complevel=9, complib='blosc')
-            store['normalised'] = self.series
-            store.close()
+        v = Channel()
+        v.load_high_freq_mains(high_freq_filename, 'volts', timezone=timezone)
+        self = self.normalise_power(voltage=v.series)
 
     def __str__(self):
         s = ""
@@ -498,7 +557,6 @@ class Channel(object):
         Args:
             start_date, end_date: strings like '2013/6/15' or datetime objects
         """
-
         cropped_chan = copy.copy(self)
         if start_date:
             cropped_chan.series = cropped_chan.series[cropped_chan.series.index 
@@ -742,5 +800,7 @@ class Channel(object):
         ax.xaxis.axis_date(tz=self.series.index.tzinfo)
         ax.xaxis.set_major_formatter(mdates.DateFormatter(date_format))
         label = label if label else self.name
-        ax.plot(self.series.index, self.series, label=label, **kwargs)
-        ax.set_ylabel('watts')        
+        _to_ordinalf_np_vectorized = np.vectorize(mdates._to_ordinalf)
+        x = _to_ordinalf_np_vectorized(self.series.index.to_pydatetime())
+        ax.plot(x, self.series, label=label, **kwargs)
+        ax.set_ylabel('watts')

@@ -17,8 +17,8 @@ Channels and then manipulating those datasets.
 I'm using the term "dataset" to mean a list of Channels.
 """
 
-def load_dataset(data_dir='/data/mine/vadeec/jack-merged', ignore_chans=None,
-                 only_load_chans=None):
+def load_dataset(data_dir=DD, ignore_chans=None, only_load_chans=None,
+                 start_date=None, end_date=None):
     """Loads an entire dataset directory.
 
     Args:
@@ -51,10 +51,11 @@ def load_dataset(data_dir='/data/mine/vadeec/jack-merged', ignore_chans=None,
         print("Attempting to load chan", chan, label, "...", end=" ")
         sys.stdout.flush()
         try:
-            channels.append(Channel(data_dir, chan))
+            c= Channel(data_dir, chan, start_date=start_date, end_date=end_date)
         except IOError:
             print("FAILED!")
         else:
+            channels.append(c)
             print("success.")
 
     return channels
@@ -71,8 +72,7 @@ def crop_dataset(dataset, start_date, end_date):
     cropped_dataset = []
     for i in range(len(dataset)):
         c = dataset[i].crop(start_date, end_date)
-        if len(c.series.index) > 0 and c.series.values.max() > 0:
-            cropped_dataset.append(c)
+        cropped_dataset.append(c)
     return cropped_dataset
 
 
@@ -159,16 +159,14 @@ def init_aggregate_and_appliance_dataset_figure(
     if aggregate_type=='one second' or plot_both_aggregate_signals:
         print('Loading high freq mains...')
         one_sec = Channel()
-        one_sec.load_normalised(data_dir, high_freq_basename='mains.dat', 
-                                high_freq_param='active')
-        print('Cropping...')
-        one_sec = one_sec.crop(start_date, end_date)
+        one_sec.load_normalised(data_dir, high_freq_param='active', 
+                                start_date=start_date, end_date=end_date)
         one_sec.plot(subplots[0], color='k', **kwargs)
 
     if aggregate_type=='current cost' or plot_both_aggregate_signals:
         print('Loading Current Cost aggregate...')
-        cc = Channel(data_dir, 'aggregate') # cc = Current cost
-        cc = cc.crop(start_date, end_date)
+        cc = Channel(data_dir, 'aggregate', 
+                     start_date=start_date, end_date=end_date) # cc = Current cost
         cc.plot(subplots[0], color='r', **kwargs)
 
     subplots[0].set_title('Aggregate. 1s active power, normalised.')
@@ -189,11 +187,23 @@ def init_aggregate_and_appliance_dataset_figure(
                           'childs_table_lamp', 'baby_monitor_tx',
                           'battery_charger', 'office_lamp1', 'office_lamp2',
                           'office_lamp3', 'gigE_switch']
-        ds = load_dataset(data_dir, ignore_chans=ignore_chans)
-        ds = crop_dataset(ds, start_date, end_date)
+        ds = load_dataset(data_dir, ignore_chans=ignore_chans, 
+                          start_date=start_date, end_date=end_date)
+        print("Removing inactive channels...")
+        ds = remove_inactive_channels(ds)
+        print("Plotting dataset ground truth...")
         plot_each_channel_activity(subplots[1], ds)
 
     return subplots, chan
+
+
+def remove_inactive_channels(ds):
+    filtered_ds = []
+    for c in ds:
+        if (c.series is not None and c.series.size > 0 and 
+            c.series.values.max() >= c.on_power_threshold):
+            filtered_ds.append(c)
+    return filtered_ds
 
 
 def cluster_appliances_period(dataset, period, ignore_chans=[], plot=False):
