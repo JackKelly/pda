@@ -97,10 +97,10 @@ def plot_each_channel_activity(ax, dataset, add_colorbar=False):
 
     img[np.isnan(img)] = 0
     img = np.transpose(img)
+    start_datenum = mdates.date2num(df.index[0])
+    end_datenum = mdates.date2num(df.index[-1])
     im = ax.imshow(img, aspect='auto', interpolation='none', origin='lower',
-                   extent=(mdates.date2num(df.index[0]),
-                           mdates.date2num(df.index[-1]), 
-                           0, df.columns.size))
+                   extent=(start_datenum, end_datenum, 0, df.columns.size))
     if add_colorbar:
         plt.colorbar(im)
 
@@ -114,6 +114,9 @@ def plot_each_channel_activity(ax, dataset, add_colorbar=False):
     for item in ax.get_yticklabels():
         item.set_fontsize(6)
     ax.set_title('Appliance ground truth')
+    print("img.shape=", img.shape)
+    for i in range(1,img.shape[0]): # Plot horizontal white lines
+        ax.plot([start_datenum, end_datenum], [i, i], color='w', linewidth=1)
     return ax
 
 
