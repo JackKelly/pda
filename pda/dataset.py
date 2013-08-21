@@ -76,7 +76,8 @@ def crop_dataset(dataset, start_date, end_date):
     return cropped_dataset
 
 
-def plot_each_channel_activity(ax, dataset, add_colorbar=False):
+def plot_each_channel_activity(ax, dataset, add_colorbar=False, 
+                               cmap=plt.cm.Blues):
     df = dataset_to_dataframe(dataset)
     df = df.resample('10S', how='max')
     img = df.values
@@ -100,7 +101,8 @@ def plot_each_channel_activity(ax, dataset, add_colorbar=False):
     start_datenum = mdates.date2num(df.index[0])
     end_datenum = mdates.date2num(df.index[-1])
     im = ax.imshow(img, aspect='auto', interpolation='none', origin='lower',
-                   extent=(start_datenum, end_datenum, 0, df.columns.size))
+                   extent=(start_datenum, end_datenum, 0, df.columns.size),
+                   cmap=cmap)
     if add_colorbar:
         plt.colorbar(im)
 
@@ -114,8 +116,11 @@ def plot_each_channel_activity(ax, dataset, add_colorbar=False):
     for item in ax.get_yticklabels():
         item.set_fontsize(6)
     ax.set_title('Appliance ground truth')
-    for i in range(1,img.shape[0]): # Plot horizontal white lines
-        ax.plot([start_datenum, end_datenum], [i, i], color='w', linewidth=1)
+
+    # Plot horizontal lines separating appliances
+    for i in range(1,img.shape[0]):
+        ax.plot([start_datenum, end_datenum], [i, i], color='grey', linewidth=1)
+
     return ax
 
 
