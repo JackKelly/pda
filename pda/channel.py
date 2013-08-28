@@ -30,8 +30,8 @@ DEFAULT_ON_POWER_THRESHOLD = 3
 
 def _secs_per_period_alias(alias):
     """Seconds for each period length."""
-    period = pd.Period('00:00', alias)
-    return (period.end_time - period.start_time).total_seconds()
+    dr = pd.date_range('00:00', periods=2, freq=alias)
+    return (dr[-1] - dr[0]).total_seconds()
 
 
 def load_labels(data_dir):
@@ -91,23 +91,14 @@ def _indicies_of_periods(datetime_index, freq):
             'H' for hourly
             'T' for minutely
 
-    Returns: period_range, period_boundaries:
+    Returns: date_range, boundaries:
 
-        period_range (pd.tseries.index.PeriodIndex): in the 
-            local time of datetime_index.
+        date_range (pd.tseries.index.DateTimeIndex)
 
-        period_boundaries (dict):
-            keys = pd.Period (in the local time of datetime_index)
-            values = 2-tuples of ints: (start index, end index for period)
+        boundaries (list):
+            2-tuples of ints: (start index, end index for period)
     """
-    try:
-        TZ = datetime_index[0].tz.zone
-    except AttributeError:
-        TZ = None
-
-    # Generate a PeriodIndex object
-    period_range = pd.period_range(datetime_index[0], datetime_index[-1], 
-                                   freq=freq)
+    date_range = pd.date_range(datetime_index[0], datetime_index[-1], freq=freq)
 
     # Declare and initialise some constants and variables used
     # during the loop...
@@ -119,8 +110,8 @@ def _indicies_of_periods(datetime_index, freq):
     MAX_SAMPLES_PER_PERIOD = _secs_per_period_alias(freq) / MIN_SAMPLE_PERIOD
     MAX_SAMPLES_PER_2_PERIODS = MAX_SAMPLES_PER_PERIOD * 2
     n_rows_processed = 0
-    period_boundaries = {}
-    for period in period_range:
+    boundaries = []
+    for end_time in date_range[1:]:
         # The simplest way to get data for just a single period is to use
         # data_for_day = datetime_index[period.strftime('%Y-%m-%d')]
         # but this takes about 300ms per call on my machine.
@@ -135,22 +126,15 @@ def _indicies_of_periods(datetime_index, freq):
         end_index = n_rows_processed+MAX_SAMPLES_PER_2_PERIODS
         rows_to_process = datetime_index[n_rows_processed:end_index]
 
-        end_time = period.end_time
-        # Convert to correct timezone.  Can't use end_time.tz_convert(TZ)
-        # because this chucks out loads of warnings:
-        # "Warning: discarding nonzero nanoseconds".  
-        # To silence these warnings we re-create the
-        # tz_localize function (see pandas/tslib.pyx) to allow us to pass
-        # warn=False to to_pydatetime().
-        end_time = pd.Timestamp(end_time.to_pydatetime(warn=False), tz=TZ)
         indicies_for_period = np.where(rows_to_process < end_time)[0]
         if indicies_for_period.size > 0:
             first_i_for_period = indicies_for_period[0] + n_rows_processed
             last_i_for_period = indicies_for_period[-1] + n_rows_processed + 1
-            period_boundaries[period] = (first_i_for_period, last_i_for_period)
+            boundaries.append((first_i_for_period, last_i_for_period))
             n_rows_processed += last_i_for_period - first_i_for_period
 
-    return period_range, period_boundaries
+    date_range = date_range[:-1] # so as not to exceed size of boundaries
+    return date_range, boundaries
 
 
 def _has_subsecond_resolution(series):
@@ -594,7 +578,8 @@ class Channel(object):
         series = (self.series if tz_convert is None else
                   self.series.tz_convert(tz_convert))
 
-        period_range, period_boundaries = _indicies_of_periods(series.index,freq)
+        date_range, boundaries = _indicies_of_periods(series.index,freq)
+        period_range = date_range.as_period(freq=freq)
         hours_on = pd.Series(index=period_range, dtype=np.float, 
                              name=self.name+' hours on')
         kwh = pd.Series(index=period_range, dtype=np.float, 
@@ -604,9 +589,9 @@ class Channel(object):
         MIN_SAMPLES_PER_PERIOD = (MAX_SAMPLES_PER_PERIOD *
                                   (1-self.acceptable_dropout_rate))
 
-        for period in period_range:
+        for period_i, period in enumerate(period_range):
             try:
-                period_start_i, period_end_i = period_boundaries[period]
+                period_start_i, period_end_i = boundaries[period_i]
             except KeyError:
                 if verbose:
                     print("No data available for   ",
@@ -690,7 +675,8 @@ class Channel(object):
         binned_data = binned_data > self.on_power_threshold
 
         timespans, boundaries = _indicies_of_periods(binned_data.index.to_timestamp(),
-                                                    timespan)
+                                                     timespan)
+        timespans = timespans.to_period(freq=timespan)
 
         first_timespan = timespans[0]
         bins = pd.period_range(first_timespan.start_time, 
@@ -701,9 +687,9 @@ class Channel(object):
         bins_per_timespan = int(round(_secs_per_period_alias(timespan) /
                                       _secs_per_period_alias(bin_size)))
 
-        for span in timespans:
+        for span_i, span in enumerate(timespans):
             try:
-                start_index, end_index = boundaries[span]
+                start_index, end_index = boundaries[span_i]
                 data_for_timespan = binned_data[start_index:end_index]
             except IndexError:
                 print("No data for", span)
