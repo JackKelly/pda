@@ -83,7 +83,7 @@ class TestHESImport(unittest.TestCase):
 
         # DO LOTS OF RANDOM TESTS
         i = 0
-        N_TESTS = 10000
+        N_TESTS = 100
         print("Running", N_TESTS, "random tests...")
         while i < N_TESTS:
             seek_point = int(np.random.rand() * FILESIZE)
