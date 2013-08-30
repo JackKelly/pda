@@ -274,7 +274,7 @@ class Channel(object):
         self.name = param
         self._update_sample_period()
 
-    def load_wattsup(self, filename, start_time=None,
+    def load_wattsup(self, filename, start_time=0,
                           timezone=DEFAULT_TIMEZONE):
         """
         Args:
@@ -284,12 +284,8 @@ class Channel(object):
 
         self.data_dir = os.path.dirname(filename)
         data = np.genfromtxt(filename)
-        if start_time is not None:
-            rng = pd.date_range(start_time, periods=len(data), 
-                                freq='1S', tz=timezone)
-        else:
-            rng = None
-
+        rng = pd.date_range(start_time, periods=len(data), 
+                            freq='S', tz=timezone)
         self.series = pd.Series(data, index=rng)
         self.sample_period = 1
 
