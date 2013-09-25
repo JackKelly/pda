@@ -15,7 +15,7 @@ REQUIREMENTS:
   pytables (sudo apt-get install python-tables)
 """
 
-DD = '/data/mine/vadeec/merged/house1'
+DD = '/data/mine/vadeec/merged/house_1'
 SECS_PER_HOUR = 3600
 SECS_PER_DAY = 86400
 MINS_PER_DAY = 1440
@@ -288,6 +288,29 @@ class Channel(object):
                             freq='S', tz=timezone)
         self.series = pd.Series(data, index=rng)
         self.sample_period = 1
+
+    def load_wattsup_raw(self, filename, start_time=0,
+                         timezone=DEFAULT_TIMEZONE):
+        """
+        Loads output file from wattsup.  Also normalises using voltage.
+        Args:
+            filename (str): including full path and suffix.
+            start_time (str or datetime): Optional    
+        """
+
+        self.data_dir = os.path.dirname(filename)
+        names = [u'Time', u'Watts', u'Volts', u'Amps', u'WattHrs',
+                 u'Cost', u'Avg Kwh', u'Mo Cost', u'Max Wts', u'Max Vlt', 
+                 u'Max Amp', u'Min Wts', u'Min Vlt', u'Min Amp',
+                 u'Pwr Fct', u'Dty Cyc', u'Pwr Cyc', 'junk1', 'junk2']
+        df = pd.read_csv(filename, sep='\t', header=None, skiprows=[0,1], 
+                         skipfooter=1, dtype=np.float32, names=names)
+        rng = pd.date_range(start_time, periods=len(df), 
+                            freq='S', tz=timezone)
+        df.index = rng
+        self.series = df.Watts
+        self.sample_period = 1
+        self = self.normalise_power(voltage=df.Volts)
 
     def _save_hdf5(self, data_dir=None, hdf5_filename=None):
         """Saves self.series to HDF5 file.
