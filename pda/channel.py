@@ -812,3 +812,26 @@ class Channel(object):
         ax.plot(x, self.series, label=label, **kwargs)
         ax.set_ylabel('watts')
         return ax
+
+    def pad(self, value=0.0, pad_head=20, pad_tail=20):
+        """
+        Pad the head and tail of self.series with values.
+
+        Args:
+          * value (float): value to pad with. Default=0
+          * pad_head (int): number of items to pad the head with. Default=20
+          * pad_tail (int): number of items to pad the tail with. Default=20
+        """
+        head_rng = pd.date_range(self.series.index[0] - pad_head, 
+                                 self.series.index[0] - 1,
+                                 freq=self.series.index.freq)
+        head = pd.Series(value, index=head_rng, dtype=self.series.dtype)
+        tail_rng = pd.date_range(self.series.index[-1] + 1,
+                                 self.series.index[-1] + pad_head, 
+                                 freq=self.series.index.freq)
+        tail = pd.Series(value, index=tail_rng, dtype=self.series.dtype)
+        new_series = self.series.append([head,tail])
+        new_series = new_series.tz_convert(self.series.index.tzinfo.zone)
+        new_series = new_series.resample(self.series.index.freq)
+        new_series.name = self.series.name
+        self.series = new_series
