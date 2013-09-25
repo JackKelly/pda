@@ -5,6 +5,7 @@ import scipy.stats as stats
 import pda.load_pwr_data as load_pwr_data
 import os, copy, datetime, sys
 import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
 
 """
 Contains the Channel class (for representing a single channel or appliance)
@@ -292,7 +293,7 @@ class Channel(object):
     def load_wattsup_raw(self, filename, start_time=0,
                          timezone=DEFAULT_TIMEZONE):
         """
-        Loads output file from wattsup.  Also normalises using voltage.
+        Loads raw output file from wattsup.
         Args:
             filename (str): including full path and suffix.
             start_time (str or datetime): Optional    
@@ -310,7 +311,6 @@ class Channel(object):
         df.index = rng
         self.series = df.Watts
         self.sample_period = 1
-        self = self.normalise_power(voltage=df.Volts)
 
     def _save_hdf5(self, data_dir=None, hdf5_filename=None):
         """Saves self.series to HDF5 file.
@@ -801,7 +801,9 @@ class Channel(object):
 
         return durations
 
-    def plot(self, ax, label=None, date_format='%d/%m/%y %H:%M:%S', **kwargs):
+    def plot(self, ax=None, label=None, date_format='%d/%m/%y %H:%M:%S', **kwargs):
+        if ax is None:
+            ax = plt.gca()
         ax.xaxis.axis_date(tz=self.series.index.tzinfo)
         ax.xaxis.set_major_formatter(mdates.DateFormatter(date_format))
         label = label if label else self.name
@@ -809,3 +811,4 @@ class Channel(object):
         x = _to_ordinalf_np_vectorized(self.series.index.to_pydatetime())
         ax.plot(x, self.series, label=label, **kwargs)
         ax.set_ylabel('watts')
+        return ax
