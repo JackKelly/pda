@@ -656,8 +656,8 @@ class Channel(object):
         secs_on = td_above_thresh.sum().astype('timedelta64[s]').astype(np.int64)
         return secs_on / SECS_PER_HOUR
 
-    def kwh(self, series=None):
-        """Returns a float representing the number of kilowatt hours (kWh) this 
+    def joules(self, series=None):
+        """Returns a float representing the number of Joules this 
         channel consumed.
 
         Args:
@@ -667,8 +667,16 @@ class Channel(object):
         td = np.diff(series.index.values.astype(np.int64)) / 1E9
         td_limited = np.where(td > self.max_sample_period,
                               self.max_sample_period, td)
-        watt_seconds = (td_limited * series.values[:-1]).sum()
-        return watt_seconds / 3600000
+        return (td_limited * series.values[:-1]).sum()
+
+    def kwh(self, series=None):
+        """Returns a float representing the number of kilowatt hours (kWh) this 
+        channel consumed.
+
+        Args:
+           series (pd.Series): optional.  Defaults to self.series
+        """
+        return self.joules(series) / 3600000
 
     def activity_distribution(self, bin_size='T', timespan='D'):
         """Returns a distribution describing when this appliance was turned
@@ -815,7 +823,7 @@ class Channel(object):
         ax.set_ylabel('watts')
         return ax
 
-    def pad(self, value=0.0, pad_head=20, pad_tail=20):
+    def pad(self, value=0.0, pad_head=200, pad_tail=200):
         """
         Pad the head and tail of self.series with values.
 
