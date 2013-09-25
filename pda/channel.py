@@ -284,7 +284,7 @@ class Channel(object):
         """
 
         self.data_dir = os.path.dirname(filename)
-        data = np.genfromtxt(filename)
+        data = np.genfromtxt(filename, dtype=np.float32)
         rng = pd.date_range(start_time, periods=len(data), 
                             freq='S', tz=timezone)
         self.series = pd.Series(data, index=rng)
@@ -309,7 +309,9 @@ class Channel(object):
         rng = pd.date_range(start_time, periods=len(df), 
                             freq='S', tz=timezone)
         df.index = rng
-        self.series = df.Watts
+        # for some reason, the dtype parameter in pd.read_csv isn't respected
+        # so set dtype for watts:
+        self.series = df.Watts.astype(np.float32) 
         self.sample_period = 1
 
     def _save_hdf5(self, data_dir=None, hdf5_filename=None):
