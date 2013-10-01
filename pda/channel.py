@@ -841,7 +841,8 @@ class Channel(object):
                                  freq=self.series.index.freq)
         tail = pd.Series(value, index=tail_rng, dtype=self.series.dtype)
         new_series = self.series.append([head,tail])
-        new_series = new_series.tz_convert(self.series.index.tzinfo.zone)
+        if self.series.index.tzinfo is not None:
+            new_series = new_series.tz_convert(self.series.index.tzinfo.zone)
         new_series = new_series.resample(self.series.index.freq)
         new_series.name = self.series.name
         self.series = new_series
