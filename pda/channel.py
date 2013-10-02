@@ -275,8 +275,7 @@ class Channel(object):
         self.name = param
         self._update_sample_period()
 
-    def load_wattsup(self, filename, start_time=0,
-                          timezone=DEFAULT_TIMEZONE):
+    def load_wattsup(self, filename, start_time=0, timezone=None):
         """
         Args:
             filename (str): including full path and suffix.
@@ -812,6 +811,11 @@ class Channel(object):
         return durations
 
     def plot(self, ax=None, label=None, date_format='%d/%m/%y %H:%M:%S', **kwargs):
+        """
+        Args:
+          * label (str): optional. Sets the label for the plotted line. The
+            caller is responsible for enabling the legend.
+        """
         if ax is None:
             ax = plt.gca()
         ax.xaxis.axis_date(tz=self.series.index.tzinfo)
