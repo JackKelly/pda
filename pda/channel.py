@@ -211,6 +211,7 @@ class Channel(object):
         if (self.sample_period is None and 
             self.series is not None and self.series.size):
             self.sample_period = _get_sample_period(self.series)
+            self.max_sample_period = self.sample_period * 3
 
     def _get_filename(self, data_dir=None, prefix='', suffix='dat'):
         data_dir = data_dir if data_dir else self.data_dir
@@ -599,7 +600,7 @@ class Channel(object):
                   self.series.tz_convert(tz_convert))
 
         date_range, boundaries = _indicies_of_periods(series.index,freq)
-        period_range = date_range.as_period(freq=freq)
+        period_range = date_range.to_period(freq=freq)
         hours_on = pd.Series(index=period_range, dtype=np.float, 
                              name=self.name+' hours on')
         kwh = pd.Series(index=period_range, dtype=np.float, 
@@ -644,7 +645,7 @@ class Channel(object):
         Args:
            series (pd.Series): optional.  Defaults to self.series
         """
-        MAX_SAMPLE_PERIOD = np.timedelta64(self.max_sample_period, 's')
+        MAX_SAMPLE_PERIOD = np.timedelta64(int(self.max_sample_period * 1E9), 'ns')
         series = self.series if series is None else series
         i_above_threshold = np.where(series[:-1] >= 
                                      self.on_power_threshold)[0]
@@ -654,6 +655,16 @@ class Channel(object):
 
         secs_on = td_above_thresh.sum().astype('timedelta64[s]').astype(np.int64)
         return secs_on / SECS_PER_HOUR
+
+    def diff_ignoring_long_outages(self):
+        """Filter out diffs where gap is > max_sample_period."""
+        MAX_SAMPLE_PERIOD = np.timedelta64(int(self.max_sample_period * 1E9), 'ns')
+        series = self.series.dropna()
+        time_diff = np.diff(series.index.values)
+        i_below_thresh = np.where(time_diff <= MAX_SAMPLE_PERIOD)
+        fwd_diff = series.diff().dropna()
+        fwd_diff = fwd_diff.iloc[i_below_thresh]
+        return fwd_diff
 
     def joules(self, series=None):
         """Returns a float representing the number of Joules this 
@@ -738,7 +749,7 @@ class Channel(object):
         when_on = self.series >= self.on_power_threshold
         # add an 'off' entry whenever data is lost for > self.max_sample_period
         time_delta = np.diff(self.series.index.values)
-        max_sample_period = np.timedelta64(self.max_sample_period, 's')
+        max_sample_period = np.timedelta64(int(self.max_sample_period * 1E9), 'ns')
         dropout_dates = self.series.index[:-1][time_delta > max_sample_period]
         insert_offs = pd.Series(False, 
                                 index=dropout_dates +

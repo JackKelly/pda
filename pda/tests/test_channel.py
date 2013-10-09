@@ -2,6 +2,7 @@
 from __future__ import print_function, division
 import unittest, os, inspect
 from pda.channel import *
+from pda.channel import _load_sometimes_unplugged, _secs_per_period_alias
 import pandas as pd
 import correct_answers
 
@@ -19,7 +20,7 @@ class TestChannel(unittest.TestCase):
         self.assertEqual(labels, correct_answers.labels)
 
     def test_load_sometimes_unplugged(self):
-        su = load_sometimes_unplugged(SMALL_TEST_DATA_PATH)
+        su = _load_sometimes_unplugged(SMALL_TEST_DATA_PATH)
         self.assertEqual(su,
                          ['laptop',
                           'kettle',
@@ -77,10 +78,14 @@ class TestChannel(unittest.TestCase):
                          ACCEPTABLE_DROPOUT_RATE_IF_SOMETIMES_UNPLUGGED)
 
     def test_secs_per_period_alias(self):
-        SECS_PER_FREQ = {'T':60, 'H': 3600, 'D': 86400, 'M': 2678400, 
+        SECS_PER_FREQ = {'T':60, 'H': 3600, 'D': 86400, 'M': 2592000, 
                          'A': 31536000}
         for alias, secs in SECS_PER_FREQ.iteritems():
-            self.assertEqual(secs_per_period_alias(alias), secs)
+            try:
+                self.assertEqual(_secs_per_period_alias(alias), secs)
+            except:
+                print(alias, secs)
+                raise
 
     def test_on(self):
         pwr = [0, 0, 100, 100, 100, 100, 0, 0, 0, 100, 100, 0, 0, 100, 100]
@@ -144,8 +149,14 @@ class TestChannel(unittest.TestCase):
         on_durations = c2.durations('on', 1)
         self.assertEqual(len(on_durations), 2)
         self.assertEqual(on_durations[0], 6*4)
-        self.assertEqual(on_durations[1], 44)
+        self.assertEqual(on_durations[1], 42)
 
+    def test_diff_ignoring_long_outages(self):
+        index = [np.datetime64(s, 's') for s in [0,1,2,3,10,11,12]]
+        series = pd.Series([0,100,150,100,1000,800,0], index=index)
+        c = Channel(series=series)
+        diff = c.diff_ignoring_long_outages()
+        np.testing.assert_array_equal(diff.values, [100, 50, -50, -200, -800])
 
 if __name__ == '__main__':
     unittest.main()
