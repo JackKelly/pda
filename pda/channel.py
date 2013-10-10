@@ -153,7 +153,7 @@ class Channel(object):
     
     Attributes:
         series (pd.Series): the power data in Watts.
-        max_sample_period (float): The maximum time allowed
+        max_sample_period (np.timedelta64['ns']): The maximum time allowed
             between samples. If data is missing for longer than
             max_sample_period then the appliance is assumed to be off.
         sample_period (float): seconds
@@ -169,7 +169,7 @@ class Channel(object):
                  chan=None, # int
                  timezone=DEFAULT_TIMEZONE, # str
                  sample_period=None, # seconds
-                 max_sample_period=20, # seconds
+                 max_sample_period=np.timedelta64(long(20E9), 'ns'),
                  series=None, # pd.Series
                  name="", # str
                  acceptable_dropout_rate = ACCEPTABLE_DROPOUT_RATE_IF_NOT_UNPLUGGED,
@@ -211,7 +211,8 @@ class Channel(object):
         if (self.sample_period is None and 
             self.series is not None and self.series.size):
             self.sample_period = _get_sample_period(self.series)
-            self.max_sample_period = self.sample_period * 3
+            max_sample_period_ns = long(self.sample_period * 3E9)
+            self.max_sample_period = np.timedelta64(max_sample_period_ns, 'ns')
 
     def _get_filename(self, data_dir=None, prefix='', suffix='dat'):
         data_dir = data_dir if data_dir else self.data_dir
@@ -645,23 +646,21 @@ class Channel(object):
         Args:
            series (pd.Series): optional.  Defaults to self.series
         """
-        MAX_SAMPLE_PERIOD = np.timedelta64(int(self.max_sample_period * 1E9), 'ns')
         series = self.series if series is None else series
         i_above_threshold = np.where(series[:-1] >= 
                                      self.on_power_threshold)[0]
         td_above_thresh = (series.index[i_above_threshold+1].values -
                            series.index[i_above_threshold].values)
-        td_above_thresh[td_above_thresh > MAX_SAMPLE_PERIOD] = MAX_SAMPLE_PERIOD
+        td_above_thresh[td_above_thresh > self.max_sample_period] = self.max_sample_period
 
         secs_on = td_above_thresh.sum().astype('timedelta64[s]').astype(np.int64)
         return secs_on / SECS_PER_HOUR
 
     def diff_ignoring_long_outages(self):
         """Filter out diffs where gap is > max_sample_period."""
-        MAX_SAMPLE_PERIOD = np.timedelta64(int(self.max_sample_period * 1E9), 'ns')
         series = self.series.dropna()
         time_diff = np.diff(series.index.values)
-        i_below_thresh = np.where(time_diff <= MAX_SAMPLE_PERIOD)
+        i_below_thresh = np.where(time_diff <= self.max_sample_period)
         fwd_diff = series.diff().dropna()
         fwd_diff = fwd_diff.iloc[i_below_thresh]
         return fwd_diff
@@ -674,10 +673,11 @@ class Channel(object):
            series (pd.Series): optional.  Defaults to self.series
         """
         series = self.series if series is None else series
-        td = np.diff(series.index.values.astype(np.int64)) / 1E9
+        td = np.diff(series.index.values)
         td_limited = np.where(td > self.max_sample_period,
                               self.max_sample_period, td)
-        return (td_limited * series.values[:-1]).sum()
+        td_limited_secs = td_limited / np.timedelta64(1, 's')
+        return (td_limited_secs * series.values[:-1]).sum()
 
     def kwh(self, series=None):
         """Returns a float representing the number of kilowatt hours (kWh) this 
@@ -749,11 +749,11 @@ class Channel(object):
         when_on = self.series >= self.on_power_threshold
         # add an 'off' entry whenever data is lost for > self.max_sample_period
         time_delta = np.diff(self.series.index.values)
-        max_sample_period = np.timedelta64(int(self.max_sample_period * 1E9), 'ns')
-        dropout_dates = self.series.index[:-1][time_delta > max_sample_period]
+        dropout_dates = self.series.index[:-1][time_delta > self.max_sample_period]
+        max_sample_period_secs = self.max_sample_period / np.timedelta64(1, 's')
         insert_offs = pd.Series(False, 
                                 index=dropout_dates +
-                                      pd.DateOffset(seconds=self.max_sample_period))
+                                      pd.DateOffset(seconds=max_sample_period_secs))
         when_on = when_on.append(insert_offs)
         when_on = when_on.sort_index()
         return when_on

@@ -139,7 +139,8 @@ class TestChannel(unittest.TestCase):
         self.assertEqual(len(on_durations), 3)
         self.assertEqual(on_durations[0], 6*4)
         self.assertEqual(on_durations[1], 6*2)
-        self.assertEqual(on_durations[2], c2.max_sample_period+c2.sample_period)
+        max_sample_period_secs = c2.max_sample_period / np.timedelta64(1, 's')
+        self.assertEqual(on_durations[2], max_sample_period_secs+c2.sample_period)
 
         # Check off-durations
         off_durations = c2.durations(on_or_off='off')
