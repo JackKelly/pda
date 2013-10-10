@@ -102,11 +102,13 @@ class TestChannel(unittest.TestCase):
                                   False, False])
 
     def test_on_off_events(self):
-        series = pd.Series([0, 0, 100, 100, 100, 0])
+        data = [0, 0, 100, 100, 100, 0]
+        rng = pd.date_range('1/1/2013', periods=len(data), freq='6S')
+        series = pd.Series(data, index=rng)
         c = Channel(series=series)
         events = c.on_off_events()
-        self.assertEqual(events[2], 1)
-        self.assertEqual(events[5], -1)
+        self.assertEqual(events['2013-01-01 00:00:12'],  1)
+        self.assertEqual(events['2013-01-01 00:00:30'], -1)
 
     def test_durations(self):
         pwr = [0, 0, 100, 100, 100, 100, 0, 0, 0, 100, 100, 0, 100, 100]
