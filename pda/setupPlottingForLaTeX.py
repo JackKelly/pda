@@ -39,7 +39,9 @@ def setup(fig_width=None, fig_height=None, columns=1):
               'xtick.labelsize': 8,
               'ytick.labelsize': 8,
               'text.usetex': True,
-              'figure.figsize': [fig_width,fig_height]}
+              'figure.figsize': [fig_width,fig_height],
+              'font.family': 'serif'
+    }
 
     matplotlib.rcParams.update(params)
 
