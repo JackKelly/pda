@@ -1,5 +1,9 @@
 # Power Data Analysis (PDA) toolkit
 
+**Please note that I have stopped development on PDA in favour of [nilmtk](https://github.com/nilmtk/nilmtk/).  All the stats functions from `pda.channel` are already in `nilmtk.stats.electricity.single`.  Eventually almost all functionality from PDA should be ported to nilmtk.**
+
+----
+
 Analysis of domestic power data.  Features include:
 
 * Load power data from a variety of sources including:
